@@ -63,7 +63,7 @@ This ensures WhatsApp recognizes your app when multiple images (1 to 100) are se
 ### Step 4: Configure the Server Endpoint
 In `TextileAPIService.swift`, update `apiBaseURL` with your deployed Cloud Run URL:
 ```swift
-var apiBaseURL: String = "https://your-surat-app-url.run.app/api"
+var apiBaseURL: String = "https://shivpriya-silk-mills-production.up.railway.app/api"
 ```
 
 ### Step 5: Run on iPhone

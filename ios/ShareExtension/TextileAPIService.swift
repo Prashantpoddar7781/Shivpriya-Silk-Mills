@@ -9,8 +9,8 @@ class TextileAPIService: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
     
     static let shared = TextileAPIService()
     
-    // Replace with your deployment URL or local tunnel
-    var apiBaseURL: String = "https://your-surat-app-url.run.app/api"
+    // Configured for Shivpriya Silk Mills Railway deployment URL
+    var apiBaseURL: String = "https://shivpriya-silk-mills-production.up.railway.app/api"
     
     private lazy var backgroundSession: URLSession = {
         let config = URLSessionConfiguration.background(withIdentifier: "com.surattextile.share.background")

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="goldShine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef3c7" />
+      <stop offset="100%" stop-color="#fde68a" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#amberGrad)" />
+  <g transform="translate(64, 64) scale(0.75)">
+    <!-- Silk Fabric Flow Lines -->
+    <path d="M120 180 C 200 120, 320 220, 400 160 C 440 130, 460 160, 440 200 C 380 320, 240 280, 160 380 C 120 430, 80 400, 90 350 Z" fill="url(#goldShine)" opacity="0.9" />
+    <path d="M160 220 C 230 170, 330 250, 410 200 C 440 180, 450 210, 420 240 C 360 340, 240 310, 180 410 C 150 450, 110 430, 120 380 Z" fill="#ffffff" opacity="0.35" />
+    <!-- ST Monogram Text -->
+    <text x="256" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="160" fill="#ffffff" text-anchor="middle" letter-spacing="-4">ST</text>
+  </g>
+</svg>
