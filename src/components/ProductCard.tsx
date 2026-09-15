@@ -53,11 +53,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <>
       <div 
         id={`product-card-${product.id}`}
-        className={`group bg-white rounded-xl border transition-all duration-200 overflow-hidden flex flex-col ${
-          isReviewNeeded 
-            ? 'border-amber-400/80 shadow-sm ring-1 ring-amber-400/40 bg-amber-50/10' 
-            : 'border-stone-200 hover:border-stone-300 hover:shadow-md'
-        }`}
+        className="group bg-white rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col"
       >
         {/* Image Container with Badges */}
         <div 
@@ -71,25 +67,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
           />
 
-          {/* Top Overlays */}
+          {/* Top Overlays - Clean design badge and category, no error queries on photo */}
           <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-1">
-            {/* Design Code Badge */}
-            <span className="px-2 py-0.5 rounded-md text-xs font-bold tracking-wider uppercase bg-stone-900/85 backdrop-blur-xs text-white shadow-xs">
-              {product.code || 'No Code'}
-            </span>
+            {product.code ? (
+              <span className="px-2 py-0.5 rounded-md text-xs font-bold tracking-wider uppercase bg-stone-900/85 backdrop-blur-xs text-white shadow-xs">
+                {product.code}
+              </span>
+            ) : <span />}
 
-            {/* Status / Review Flag */}
-            {isReviewNeeded ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-500 text-white shadow-xs">
-                <AlertTriangle className="w-3 h-3" />
-                Needs Review
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-emerald-600/90 text-white backdrop-blur-xs">
-                <CheckCircle className="w-3 h-3" />
-                Ready
-              </span>
-            )}
+            <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-stone-900/70 text-white backdrop-blur-xs">
+              {product.category || 'Textile'}
+            </span>
           </div>
         </div>
 
@@ -101,34 +89,28 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="flex items-baseline justify-between gap-1 mb-1">
               <div className="flex items-baseline gap-1">
                 <span className="text-xs font-medium text-stone-500">Rate:</span>
-                <span className={`text-xl font-black tracking-tight ${product.price ? 'text-stone-900' : 'text-rose-600'}`}>
-                  {product.price ? `₹${product.price}` : 'Missing Rate'}
+                <span className="text-xl font-black tracking-tight text-stone-900">
+                  {product.price ? `₹${product.price}` : 'Rate on Request'}
                 </span>
                 {product.price && <span className="text-xs text-stone-400">/-</span>}
               </div>
 
-              {/* Fabric Pill */}
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                product.fabric 
-                  ? 'bg-amber-100 text-amber-900' 
-                  : 'bg-rose-100 text-rose-800'
-              }`}>
-                {product.fabric || 'Fabric Unclear'}
-              </span>
+              {/* Fabric Pill (only shown if fabric is known - never show 'Fabric Unclear') */}
+              {product.fabric ? (
+                <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900">
+                  {product.fabric}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600">
+                  {product.category}
+                </span>
+              )}
             </div>
 
             {/* Supplier / Mill */}
             <p className="text-xs text-stone-600 truncate font-medium" title={product.supplier}>
               {product.supplier}
             </p>
-
-            {/* Flagged reasons if needs review (Admin only) */}
-            {isAdmin && product.flaggedReasons && product.flaggedReasons.length > 0 && (
-              <div className="mt-1.5 p-1.5 bg-amber-50 border border-amber-200/80 rounded-md text-[11px] text-amber-800 flex items-start gap-1">
-                <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
-                <span className="line-clamp-1">{product.flaggedReasons.join(', ')}</span>
-              </div>
-            )}
           </div>
 
           {/* Action Row */}

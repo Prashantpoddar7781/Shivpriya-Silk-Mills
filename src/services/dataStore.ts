@@ -8,171 +8,11 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'catalogue.json');
 
-// Pre-seeded high quality Surat textile items if database is freshly created
-export const INITIAL_SAMPLE_ITEMS = [
-  {
-    code: 'R182',
-    fabric: 'Rayon',
-    price: 450,
-    supplier: 'Radhe Krishna Tex (Millennium Market)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&auto=format&fit=crop&q=80',
-    originalText: '₹450 | Rayon | R182',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 2,
-  },
-  {
-    code: 'D-998',
-    fabric: 'Georgette',
-    price: 620,
-    supplier: 'Radhe Krishna Tex (Millennium Market)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=700&auto=format&fit=crop&q=80',
-    originalText: 'D-998 Price: 620 Quality: Georgette',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 4,
-  },
-  {
-    code: 'DS-77',
-    fabric: 'Dola Silk',
-    price: 380,
-    supplier: 'Mahalaxmi Saree Kendra (Ring Road)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=700&auto=format&fit=crop&q=80',
-    originalText: '₹380 | Dola Silk | DS-77',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 8,
-  },
-  {
-    code: 'CH-990',
-    fabric: 'Chanderi Cotton',
-    price: 420,
-    supplier: 'Mahalaxmi Saree Kendra (Ring Road)',
-    category: 'Suits' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=700&auto=format&fit=crop&q=80',
-    originalText: 'Rate 420 | Chanderi Cotton | CH-990',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 12,
-  },
-  {
-    code: 'ORG-105',
-    fabric: 'Organza',
-    price: 490,
-    supplier: 'Shree Balaji Creation (Japan Market)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=700&auto=format&fit=crop&q=80',
-    originalText: '₹490 | Organza Silk | ORG-105',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 18,
-  },
-  {
-    code: 'BS-220',
-    fabric: 'Bandhani Silk',
-    price: 350,
-    supplier: 'Shree Balaji Creation (Japan Market)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1610030469668-932d43fa58a7?w=700&auto=format&fit=crop&q=80',
-    originalText: '350/- Bandhani Silk BS-220',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 24,
-  },
-  {
-    code: 'CR-512',
-    fabric: 'Crepe',
-    price: 520,
-    supplier: 'Om Silk Mills (Sahara Darwaja)',
-    category: 'Suits' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=700&auto=format&fit=crop&q=80',
-    originalText: 'Price 520 Crepe Digital Print CR-512',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 36,
-  },
-  {
-    code: 'D-1024',
-    fabric: 'Pure Cotton',
-    price: 320,
-    supplier: 'Om Silk Mills (Sahara Darwaja)',
-    category: 'Suits' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=700&auto=format&fit=crop&q=80',
-    originalText: 'Rate 320/- D.No. 1024 Pure Cotton',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 48,
-  },
-  {
-    code: 'RY-310',
-    fabric: 'Heavy Rayon',
-    price: 460,
-    supplier: 'Kavita Fashion (Radhe Market)',
-    category: 'Dress Material' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=700&auto=format&fit=crop&q=80',
-    originalText: 'Heavy Rayon 14KG Rate: 460/- RY-310',
-    status: 'approved' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: [],
-    dateOffsetHours: 60,
-  },
-  // Items flagged for father review (unclear/missing fields from WhatsApp stamp)
-  {
-    code: 'SK-401',
-    fabric: 'Rayon',
-    price: null, // Price missing on stamp!
-    supplier: 'Radhe Krishna Tex (Millennium Market)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=700&auto=format&fit=crop&q=80',
-    originalText: 'Rayon Foil Print Design SK-401 (Rate tag torn)',
-    status: 'needs_review' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: ['Price missing on stamp'],
-    dateOffsetHours: 1,
-  },
-  {
-    code: null, // Missing code
-    fabric: 'Dola Silk',
-    price: 480,
-    supplier: 'Mahalaxmi Saree Kendra (Ring Road)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=700&auto=format&fit=crop&q=80',
-    originalText: '₹480/- Dola Silk Floral (Design No blurred)',
-    status: 'needs_review' as const,
-    ocrMethod: 'tier2_gemini' as const,
-    flaggedReasons: ['Product code blurred or missing'],
-    dateOffsetHours: 1,
-  },
-  {
-    code: 'JAC-88',
-    fabric: null, // Fabric unclear
-    price: 540,
-    supplier: 'Shree Balaji Creation (Japan Market)',
-    category: 'Sarees' as const,
-    imageUrl: 'https://images.unsplash.com/photo-1610030469668-932d43fa58a7?w=700&auto=format&fit=crop&q=80',
-    originalText: '₹540 JAC-88 Fancy Mill Jacquard Special',
-    status: 'needs_review' as const,
-    ocrMethod: 'tier1_regex' as const,
-    flaggedReasons: ['Fabric quality unclear'],
-    dateOffsetHours: 2,
-  },
-];
-
 export interface BatchItemInput {
   id?: string;
   imageUrl: string;
   textHint?: string;
+  price?: number;
   category?: 'Sarees' | 'Suits' | 'Dress Material' | 'Kurtis';
   hash?: string;
 }
@@ -183,14 +23,14 @@ export class DataStore {
   private hashCache: Map<string, ProductRecord> = new Map();
 
   private metrics: CostMetrics = {
-    totalImagesProcessed: 1248,
-    tier1FreeCount: 1162,
-    tier2GeminiCount: 86,
-    cacheHits: 142,
-    totalCostUSD: 0.0344,
-    savedCostUSD: 59.85,
-    dailyVolumeAvg: 380,
-    projectedMonthlyCost: 1.15,
+    totalImagesProcessed: 0,
+    tier1FreeCount: 0,
+    tier2GeminiCount: 0,
+    cacheHits: 0,
+    totalCostUSD: 0,
+    savedCostUSD: 0,
+    dailyVolumeAvg: 0,
+    projectedMonthlyCost: 0,
     storageReductionPercent: 82.4,
   };
 
@@ -199,6 +39,20 @@ export class DataStore {
   constructor() {
     this.initDirectories();
     this.loadFromDisk();
+    this.cleanMockData();
+  }
+
+  public cleanMockData(): number {
+    let removed = 0;
+    for (const [id, prod] of this.products.entries()) {
+      if (prod.batchId === 'batch_seed_01' || prod.imageUrl?.includes('unsplash.com')) {
+        this.products.delete(id);
+        removed++;
+      }
+    }
+    this.batches.delete('batch_seed_01');
+    this.saveToDiskSync();
+    return removed;
   }
 
   private initDirectories() {
@@ -216,67 +70,26 @@ export class DataStore {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.batches)) {
-          parsed.batches.forEach((b: BatchRecord) => this.batches.set(b.id, b));
+          parsed.batches
+            .filter((b: BatchRecord) => b.id !== 'batch_seed_01')
+            .forEach((b: BatchRecord) => this.batches.set(b.id, b));
         }
         if (Array.isArray(parsed.products)) {
-          parsed.products.forEach((p: ProductRecord) => {
-            this.products.set(p.id, p);
-            if (p.hash) this.hashCache.set(p.hash, p);
-          });
+          parsed.products
+            .filter((p: ProductRecord) => p.batchId !== 'batch_seed_01' && !p.imageUrl?.includes('unsplash.com'))
+            .forEach((p: ProductRecord) => {
+              this.products.set(p.id, p);
+              if (p.hash) this.hashCache.set(p.hash, p);
+            });
         }
         if (parsed.metrics) {
           this.metrics = { ...this.metrics, ...parsed.metrics };
         }
         return;
       } catch (err) {
-        console.error('Failed to parse existing data file, re-seeding:', err);
+        console.error('Failed to parse existing data file:', err);
       }
     }
-
-    // Seed initial dataset if no file exists
-    this.seedInitialDataset();
-    this.saveToDiskSync();
-  }
-
-  private seedInitialDataset() {
-    const initialBatchId = 'batch_seed_01';
-    const now = Date.now();
-
-    const initialBatch: BatchRecord = {
-      id: initialBatchId,
-      supplierName: 'Radhe Krishna Tex (Millennium Market)',
-      totalImages: 50,
-      processedCount: 50,
-      readyCount: 47,
-      reviewCount: 3,
-      approvedCount: 47,
-      status: 'completed',
-      createdAt: new Date(now - 3600000).toISOString(),
-      costEstimateUSD: 0.0016,
-      source: 'ios_share_extension',
-    };
-    this.batches.set(initialBatchId, initialBatch);
-
-    INITIAL_SAMPLE_ITEMS.forEach((item, index) => {
-      const id = `prod_${index + 1}`;
-      const record: ProductRecord = {
-        id,
-        batchId: initialBatchId,
-        supplier: item.supplier,
-        category: item.category,
-        price: item.price,
-        fabric: item.fabric,
-        code: item.code,
-        imageUrl: item.imageUrl,
-        originalText: item.originalText,
-        status: item.status,
-        flaggedReasons: item.flaggedReasons,
-        ocrMethod: item.ocrMethod,
-        confidence: item.status === 'approved' ? 0.98 : 0.65,
-        createdAt: new Date(now - item.dateOffsetHours * 3600000).toISOString(),
-      };
-      this.products.set(id, record);
-    });
   }
 
   /**
@@ -615,13 +428,19 @@ export class DataStore {
           }
         }
 
-        // 5. Check if father review is required
-        const flaggedReasons: string[] = [];
-        if (finalData.price === null) flaggedReasons.push('Price missing on stamp');
-        if (!finalData.fabric) flaggedReasons.push('Fabric quality unclear');
-        if (!finalData.code) flaggedReasons.push('Product code blurred or missing');
+        if (typeof item.price === 'number' && item.price > 0) {
+          finalData.price = item.price;
+        }
 
-        const needsReview = flaggedReasons.length > 0;
+        // 5. Check if father review is required
+        // In wholesale textile photos, fabric and code are often omitted or implied.
+        // Only flag for review if wholesale price is completely missing.
+        const flaggedReasons: string[] = [];
+        if (finalData.price === null) {
+          flaggedReasons.push('Price not found on image');
+        }
+
+        const needsReview = finalData.price === null;
         const status: ProductRecord['status'] = needsReview ? 'needs_review' : 'ready';
 
         const record: ProductRecord = {

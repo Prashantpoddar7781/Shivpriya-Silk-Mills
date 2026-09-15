@@ -65,6 +65,16 @@ async function startServer() {
     res.redirect(303, '/?shared=1');
   });
 
+  // Admin endpoint to purge random/seed mock images
+  app.post('/api/clean-mock-data', (req, res) => {
+    try {
+      const removed = dataStore.cleanMockData();
+      res.json({ success: true, removed });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // 2. Get all batches
   app.get('/api/batches', (req, res) => {
     try {

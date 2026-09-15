@@ -106,20 +106,30 @@ export function parseSuratTextileRegex(text: string): {
   }
 
   // 2. Product code extraction
-  // Matches: R182, D.No. 1024, D-998, SK-401, Design No: 884, No. 551, CAT-12, K-90, DES-104
-  const codeBlacklist = new Set(['BLURRED', 'TORN', 'MISSING', 'UNCLEAR', 'UNKNOWN', 'NONE', 'NULL', 'RATE', 'PRICE', 'QUALITY', 'SPECIAL', 'FABRIC', 'PHOTO', 'CATALOGUE', 'NEW']);
+  // Matches: R182, D.No. 1024, D-998, SK-401, RG, Design No: 884, No. 551, CAT-12, K-90, DES-104
+  const codeBlacklist = new Set([
+    'BLURRED', 'TORN', 'MISSING', 'UNCLEAR', 'UNKNOWN', 'NONE', 'NULL',
+    'RATE', 'PRICE', 'QUALITY', 'SPECIAL', 'FABRIC', 'PHOTO', 'CATALOGUE', 'NEW',
+    'JPG', 'JPEG', 'PNG', 'WEBP'
+  ]);
+
   const codeMatches = [
     /(?:d\.?\s*no\.?|design(?:\s*no\.?)?|art(?:\s*no\.?)?|code|item|d-)\s*[:#\-]?\s*([A-Za-z0-9\-_]{2,14})/i,
     /\b([A-Z]{1,4}[-_]?\d{2,6}[A-Z]?)\b/,
-    /(?:^|[|\s])#?([A-Za-z0-9]{3,8})(?:[|\s]|$)/
+    /(?:^|[|\s])#?([A-Za-z0-9]{3,8})(?:[|\s]|$)/,
+    // Brand/Supplier acronyms printed on fabric (e.g. RG, SK, MK)
+    /\b([A-Z]{2,4})\b/
   ];
 
   for (const regex of codeMatches) {
     const match = clean.match(regex);
     if (match && match[1]) {
       const candidate = match[1].trim().toUpperCase();
+      // Ignore WhatsApp file prefixes like WA0016 or IMG-
       if (
         !codeBlacklist.has(candidate) &&
+        !/^WA\d+$/i.test(candidate) &&
+        !/^IMG/i.test(candidate) &&
         (!fabric || !fabric.toUpperCase().includes(candidate))
       ) {
         code = candidate;
@@ -129,11 +139,13 @@ export function parseSuratTextileRegex(text: string): {
   }
 
   // 3. Price extraction
-  // Matches: ₹450, 450/-, Rate: 450, Rs. 450, Price: 450, Rt-450, 450rs, 450 net
+  // Matches: ₹450, 450/-, Rate: 450, Rs. 450, Price: 450, Rt-450, 450rs, 450 net, 375
   const priceMatches = [
     /(?:₹|rs\.?|inr|rate[:\s\-]*|price[:\s\-]*|rt[:\s\-]*)\s*(\d{3,5})(?:\s*\/\-|\b)/i,
     /(?<![A-Za-z0-9\-_])(\d{3,5})\s*\/\-/,
-    /(?:^|[|\s,])(\d{3,5})(?:\s*net|\s*fixed)?(?:[|\s,]|$)/i
+    /(?:^|[|\s,])(\d{3,5})(?:\s*net|\s*fixed)?(?:[|\s,]|$)/i,
+    // Pure standalone 3 to 4 digit numbers (standard wholesale prices between 150 and 9999)
+    /\b([1-9]\d{2,3})\b/
   ];
 
   for (const regex of priceMatches) {
@@ -158,7 +170,8 @@ export function parseSuratTextileRegex(text: string): {
   if (fabric === null) missingFields.push('fabric');
   if (code === null) missingFields.push('code');
 
-  const isComplete = missingFields.length === 0;
+  // In wholesale trading, price is the only essential field for buyers
+  const isComplete = price !== null;
 
   return {
     data: { price, fabric, code },
