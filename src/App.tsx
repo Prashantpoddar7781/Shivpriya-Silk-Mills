@@ -36,6 +36,7 @@ import {
   UserSession
 } from './types.js';
 import { apiUrl } from './services/api.js';
+import { getAndClearSharedFiles } from './services/shareDb.js';
 import { 
   Layers, 
   CheckCircle2, 
@@ -89,6 +90,7 @@ export default function App() {
   // Modal states
   const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [sharedFiles, setSharedFiles] = useState<File[]>([]);
   const [dbSuppliers, setDbSuppliers] = useState<string[]>([]);
 
   // Load data
@@ -146,6 +148,35 @@ export default function App() {
   useEffect(() => {
     loadBatches();
     loadSuppliers();
+
+    // Check for images shared via WhatsApp Web Share Target
+    const checkSharedImages = async () => {
+      try {
+        const files = await getAndClearSharedFiles();
+        if (files && files.length > 0) {
+          setSharedFiles(files);
+          setIsUploadModalOpen(true);
+          setAdminToast(`WhatsApp Share: Received ${files.length} design(s)! Select supplier.`);
+          if (window.location.search.includes('shared=')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check shared images:', err);
+      }
+    };
+
+    checkSharedImages();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkSharedImages();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -591,11 +622,15 @@ export default function App() {
         nextProductToReview={nextReviewProduct}
       />
 
-      {/* Web Drag-and-Drop Uploader */}
+      {/* Web Drag-and-Drop & WhatsApp Share Target Uploader */}
       <WebUploadModal
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setSharedFiles([]);
+        }}
         onUploadSuccess={handleBatchCreated}
+        initialFiles={sharedFiles}
       />
 
       {/* Admin Mode Floating Toast Feedback */}

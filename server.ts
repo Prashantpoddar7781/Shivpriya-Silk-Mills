@@ -60,6 +60,11 @@ async function startServer() {
     }
   });
 
+  // Web Share Target fallback (prevents HTTP 405 if POST hits backend directly)
+  app.all('/share-target', (req, res) => {
+    res.redirect(303, '/?shared=1');
+  });
+
   // 2. Get all batches
   app.get('/api/batches', (req, res) => {
     try {

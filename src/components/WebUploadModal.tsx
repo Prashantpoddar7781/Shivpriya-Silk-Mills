@@ -14,12 +14,14 @@ interface WebUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUploadSuccess: (batchId: string) => void;
+  initialFiles?: File[];
 }
 
 export const WebUploadModal: React.FC<WebUploadModalProps> = ({
   isOpen,
   onClose,
   onUploadSuccess,
+  initialFiles,
 }) => {
   if (!isOpen) return null;
 
@@ -47,6 +49,25 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
       })
       .catch(() => {});
   }, []);
+
+  React.useEffect(() => {
+    if (initialFiles && initialFiles.length > 0) {
+      setSelectedFiles(initialFiles);
+      const newPreviews: string[] = [];
+      initialFiles.slice(0, 9).forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            newPreviews.push(e.target.result as string);
+            if (newPreviews.length === Math.min(initialFiles.length, 9)) {
+              setPreviews([...newPreviews]);
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  }, [initialFiles]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
