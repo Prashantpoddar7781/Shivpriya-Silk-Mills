@@ -6,7 +6,8 @@ import {
   Check, 
   Zap, 
   Store, 
-  Tag 
+  Tag,
+  AlertCircle
 } from 'lucide-react';
 import { apiUrl } from '../services/api.js';
 
@@ -31,6 +32,7 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
   const [previews, setPreviews] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [availableSuppliers, setAvailableSuppliers] = useState<string[]>([
     'Radhe Krishna Tex',
     'Mahalaxmi Saree Kendra',
@@ -53,6 +55,7 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
   React.useEffect(() => {
     if (initialFiles && initialFiles.length > 0) {
       setSelectedFiles(initialFiles);
+      setUploadError(null);
       const newPreviews: string[] = [];
       initialFiles.slice(0, 9).forEach((file) => {
         const reader = new FileReader();
@@ -75,6 +78,7 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
     if (!files || files.length === 0) return;
     const fileList = Array.from(files);
     setSelectedFiles(fileList);
+    setUploadError(null);
 
     // Generate previews
     const newPreviews: string[] = [];
@@ -123,8 +127,12 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
           const compressed = canvas.toDataURL('image/jpeg', 0.8);
           resolve(compressed);
         };
+        img.onerror = () => {
+          resolve((e.target?.result as string) || '');
+        };
         img.src = e.target?.result as string;
       };
+      reader.onerror = () => resolve('');
       reader.readAsDataURL(file);
     });
   };
@@ -132,24 +140,29 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
     setIsProcessing(true);
+    setUploadError(null);
     setUploadProgress(10);
 
     try {
       const compressedItems = [];
       for (let i = 0; i < selectedFiles.length; i++) {
         const base64 = await compressImage(selectedFiles[i]);
+        if (!base64) {
+          throw new Error(`Failed to read file: ${selectedFiles[i].name || 'unknown image'}`);
+        }
         compressedItems.push({
-          id: `web_img_${i + 1}`,
+          id: `web_img_${Date.now()}_${i + 1}`,
           imageUrl: base64,
           category,
-          textHint: selectedFiles[i].name, // filename often contains code or rate hint
+          textHint: selectedFiles[i].name || supplierName,
         });
         setUploadProgress(10 + Math.round(((i + 1) / selectedFiles.length) * 50));
       }
 
       setUploadProgress(70);
 
-      const res = await fetch(apiUrl('/api/batches/upload'), {
+      const targetUrl = apiUrl('/api/batches/upload');
+      const res = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,13 +174,24 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
         }),
       });
 
+      if (!res.ok) {
+        const errorText = await res.text();
+        let errorMsg = `Server returned status ${res.status}`;
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed.error) errorMsg = parsed.error;
+        } catch {}
+        throw new Error(errorMsg);
+      }
+
       setUploadProgress(100);
       const batch = await res.json();
       setIsProcessing(false);
       onUploadSuccess(batch.id);
       onClose();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('[Batch Upload Error]', err);
+      setUploadError(err.message || 'Failed to upload batch to server');
       setIsProcessing(false);
     }
   };
@@ -193,6 +217,17 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Error Notice */}
+        {uploadError && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-900">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold">Upload Error</p>
+              <p className="text-[11px] text-rose-700">{uploadError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Form Body */}
         <div className="space-y-3.5">

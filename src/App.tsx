@@ -186,19 +186,22 @@ export default function App() {
   // Real-time polling for actively processing batch
   useEffect(() => {
     if (!activeBatchId) return;
-    const current = batches.find((b) => b.id === activeBatchId);
-    if (!current || current.status !== 'processing') return;
 
     const interval = setInterval(async () => {
       try {
         const res = await fetch(apiUrl(`/api/batches/${activeBatchId}`));
         if (res.ok) {
           const { batch } = await res.json();
-          setBatches((prev) => prev.map((b) => (b.id === activeBatchId ? batch : b)));
-          if (batch.status === 'completed') {
+          setBatches((prev) => {
+            const exists = prev.some((b) => b.id === activeBatchId);
+            return exists ? prev.map((b) => (b.id === activeBatchId ? batch : b)) : [batch, ...prev];
+          });
+
+          if (batch.status === 'completed' || batch.status === 'failed') {
+            clearInterval(interval);
             loadProducts();
             loadSuppliers();
-            setAdminToast(`Batch complete: ${batch.readyCount} ready · ${batch.reviewCount} need review`);
+            setAdminToast(`Batch complete: ${batch.readyCount || 0} ready · ${batch.reviewCount || 0} need review`);
             setTimeout(() => setAdminToast(null), 4000);
           }
         }
@@ -208,7 +211,7 @@ export default function App() {
     }, 1500);
 
     return () => clearInterval(interval);
-  }, [activeBatchId, batches]);
+  }, [activeBatchId]);
 
   // Derived lists for dropdowns
   const suppliers = useMemo(() => {
