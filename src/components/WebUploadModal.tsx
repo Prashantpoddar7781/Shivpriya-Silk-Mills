@@ -140,6 +140,10 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
+    if (!supplierName.trim()) {
+      setUploadError('Supplier / Mill Name is compulsory. Please enter or select a supplier.');
+      return;
+    }
     setIsProcessing(true);
     setUploadError(null);
     setUploadProgress(10);
@@ -382,20 +386,27 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
         </div>
 
         {/* Action Button */}
-        <div className="pt-3 border-t border-stone-100">
+        <div className="pt-3 border-t border-stone-100 space-y-1.5">
           <button
             id="btn-confirm-upload"
             onClick={handleUpload}
-            disabled={selectedFiles.length === 0 || isProcessing}
-            className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-sm cursor-pointer disabled:opacity-50"
+            disabled={selectedFiles.length === 0 || isProcessing || !supplierName.trim()}
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white transition shadow-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <UploadCloud className="w-4 h-4" />
             <span>
               {isProcessing
                 ? 'Processing Batch...'
+                : !supplierName.trim()
+                ? 'Enter Supplier Name to Upload'
                 : `Upload ${selectedFiles.length || ''} Images to Catalogue`}
             </span>
           </button>
+          {!supplierName.trim() && (
+            <p className="text-[11px] text-amber-700 font-medium text-center">
+              * Supplier / Mill Name is mandatory for B2B cataloguing
+            </p>
+          )}
         </div>
 
       </div>

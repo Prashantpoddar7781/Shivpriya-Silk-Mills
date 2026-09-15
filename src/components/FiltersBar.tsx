@@ -38,11 +38,9 @@ export const FiltersBar: React.FC<FiltersBarProps> = ({
     });
   };
 
-  const applyPreset = (category: string, fabric: string, min: number, max: number) => {
+  const applyPricePreset = (min: number, max: number) => {
     setFilters((prev) => ({
       ...prev,
-      category,
-      fabric,
       minPrice: min,
       maxPrice: max,
     }));
@@ -65,24 +63,43 @@ export const FiltersBar: React.FC<FiltersBarProps> = ({
           />
         </div>
 
-        {/* Quick Example Preset: Sarees + Rayon + ₹300-₹500 */}
+        {/* Quick Wholesale Price Chips */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-semibold uppercase tracking-wider text-stone-400 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Quick Match:
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Quick Price:
           </span>
           <button
-            id="btn-preset-sarees-rayon-300-500"
-            onClick={() => applyPreset('Sarees', 'Rayon', 300, 500)}
-            className="px-2.5 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 transition cursor-pointer"
+            id="btn-preset-under-400"
+            onClick={() => applyPricePreset(0, 400)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-full border transition cursor-pointer ${
+              filters.minPrice === 0 && filters.maxPrice === 400
+                ? 'bg-amber-600 text-white border-amber-600 font-bold'
+                : 'bg-stone-100 text-stone-800 border-stone-200 hover:bg-stone-200'
+            }`}
           >
-            Sarees + Rayon + ₹300–₹500
+            Under ₹400
           </button>
           <button
-            id="btn-preset-georgette-400-700"
-            onClick={() => applyPreset('Sarees', 'Georgette', 400, 700)}
-            className="px-2.5 py-1 text-xs font-medium rounded-full bg-stone-100 text-stone-800 border border-stone-200 hover:bg-stone-200 transition cursor-pointer"
+            id="btn-preset-400-500"
+            onClick={() => applyPricePreset(400, 500)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-full border transition cursor-pointer ${
+              filters.minPrice === 400 && filters.maxPrice === 500
+                ? 'bg-amber-600 text-white border-amber-600 font-bold'
+                : 'bg-stone-100 text-stone-800 border-stone-200 hover:bg-stone-200'
+            }`}
           >
-            Georgette + ₹400–₹700
+            ₹400 – ₹500
+          </button>
+          <button
+            id="btn-preset-above-500"
+            onClick={() => applyPricePreset(500, 5000)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-full border transition cursor-pointer ${
+              filters.minPrice === 500 && filters.maxPrice === 5000
+                ? 'bg-amber-600 text-white border-amber-600 font-bold'
+                : 'bg-stone-100 text-stone-800 border-stone-200 hover:bg-stone-200'
+            }`}
+          >
+            Above ₹500
           </button>
           {isFiltered && (
             <button
