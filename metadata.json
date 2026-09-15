@@ -1,0 +1,7 @@
+{
+  "name": "Surat Textile B2B Catalogue & iOS Share OCR",
+  "description": "Private B2B textile catalogue for Surat agents with WhatsApp iOS Share Extension, cost-efficient 2-tier OCR/AI extraction, batch processing, and wholesale catalogue filters.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,235 @@
+import 'dotenv/config';
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { createServer as createViteServer } from 'vite';
+import { dataStore } from './src/services/dataStore.js';
+import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision } from './src/services/textileOcr.js';
+
+async function startServer() {
+  const app = express();
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  // Support cross-origin requests from Vercel deployment, iOS, etc.
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Client-Source');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
+  // Support high payload for batch image transfers (up to 100 images) from iOS Share Extension
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+
+  // Static serving for locally stored uploads (e.g. /uploads/img_xxx.jpg)
+  const uploadsPath = path.join(process.cwd(), 'data', 'uploads');
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+  }
+  app.use('/uploads', express.static(uploadsPath));
+
+  // --- API Routes ---
+
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // 1. Upload batch (called from iOS Share Extension or Web Uploader)
+  app.post('/api/batches/upload', async (req, res) => {
+    try {
+      const { supplierName, images, source } = req.body;
+      if (!images || !Array.isArray(images) || images.length === 0) {
+        return res.status(400).json({ error: 'Please provide at least 1 image in the batch.' });
+      }
+
+      const batch = await dataStore.createAndProcessBatch(
+        supplierName || 'Surat Supplier',
+        images,
+        source || 'ios_share_extension'
+      );
+
+      res.status(201).json(batch);
+    } catch (err: any) {
+      console.error('Batch upload error:', err);
+      res.status(500).json({ error: err.message || 'Failed to create batch' });
+    }
+  });
+
+  // 2. Get all batches
+  app.get('/api/batches', (req, res) => {
+    try {
+      const batches = dataStore.getBatches();
+      res.json(batches);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3. Get specific batch with real-time status and item list
+  app.get('/api/batches/:id', (req, res) => {
+    try {
+      const batch = dataStore.getBatch(req.params.id);
+      if (!batch) {
+        return res.status(404).json({ error: 'Batch not found' });
+      }
+      const products = dataStore.getBatchProducts(req.params.id);
+      res.json({ batch, products });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 4. Products query (with the 4 core filters: date, supplier, price range, fabric)
+  app.get('/api/products', (req, res) => {
+    try {
+      const {
+        date,
+        supplier,
+        minPrice,
+        maxPrice,
+        fabric,
+        category,
+        searchQuery,
+        status,
+      } = req.query;
+
+      const products = dataStore.getProducts({
+        date: date as string,
+        supplier: supplier as string,
+        minPrice: minPrice ? Number(minPrice) : undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        fabric: fabric as string,
+        category: category as string,
+        searchQuery: searchQuery as string,
+        status: status as string,
+      });
+
+      res.json(products);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 5. Update single product (Father's quick review & correction)
+  app.patch('/api/products/:id', (req, res) => {
+    try {
+      const updated = dataStore.updateProduct(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 6. Bulk approve ready products in batch
+  app.post('/api/products/bulk-approve', (req, res) => {
+    try {
+      const { batchId } = req.body;
+      if (!batchId) {
+        return res.status(400).json({ error: 'batchId is required' });
+      }
+      const count = dataStore.bulkApproveBatch(batchId);
+      res.json({ approvedCount: count });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 7. Get dynamic list of all suppliers with design counts
+  app.get('/api/suppliers', (req, res) => {
+    try {
+      const suppliers = dataStore.getSuppliers();
+      res.json(suppliers);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 8. Test OCR extraction on a single image or text stamp
+  app.post('/api/ocr/test-extract', async (req, res) => {
+    try {
+      const { text, imageUrl } = req.body;
+      let rawText = text || '';
+      let usedMethod = 'tier1_regex';
+
+      // If no text hint provided but image is present, run local Tesseract OCR
+      if (!rawText && imageUrl) {
+        rawText = await runLocalOcr(imageUrl);
+        usedMethod = 'tier1_tesseract';
+      }
+
+      const tier1 = parseSuratTextileRegex(rawText);
+      let finalData = tier1.data;
+
+      // If Tier 1 incomplete and image provided, fall back to Gemini Vision
+      if (!tier1.isComplete && imageUrl) {
+        const tier2 = await parseWithGeminiVision(imageUrl, rawText, tier1.data);
+        finalData = {
+          price: tier1.data.price ?? tier2.data.price,
+          fabric: tier1.data.fabric ?? tier2.data.fabric,
+          code: tier1.data.code ?? tier2.data.code,
+        };
+        usedMethod = 'tier2_gemini';
+      }
+
+      res.json({
+        data: finalData,
+        method: usedMethod,
+        rawOcrText: rawText,
+        tier1Attempt: tier1,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 9. Cost Optimization Metrics & Projections
+  app.get('/api/metrics', (req, res) => {
+    try {
+      const metrics = dataStore.getMetrics();
+      res.json(metrics);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Vite / Frontend Serving ---
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  function listen(portToTry: number) {
+    const server = app.listen(portToTry, '0.0.0.0', () => {
+      console.log(`Surat Textile B2B Server running on port ${portToTry}`);
+    });
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`Port ${portToTry} is already in use. Trying port ${portToTry + 1}...`);
+        listen(portToTry + 1);
+      } else {
+        console.error('Server error:', err);
+      }
+    });
+  }
+
+  listen(PORT);
+}
+
+startServer();
