@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { BatchRecord, CostMetrics, ProductRecord } from '../types.js';
-import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision } from './textileOcr.js';
+import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision, extractDigitalWholesaleRate } from './textileOcr.js';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
@@ -384,17 +384,35 @@ export class DataStore {
           continue;
         }
 
-        // 3. Tier 1: Zero-cost regex + local OCR
+        // 3. Tier 1: Digital WhatsApp overlay extraction (white font) + regex + local OCR
+        let digitalRate: number | null = null;
+        if (item.imageUrl) {
+          try {
+            digitalRate = await extractDigitalWholesaleRate(item.imageUrl);
+          } catch (e) {
+            console.warn('Digital rate extraction warning:', e);
+          }
+        }
+
         let rawOcrText = item.textHint || '';
         let tier1Result = parseSuratTextileRegex(rawOcrText);
 
-        // If text hint didn't yield full fields and image is present, try local Tesseract OCR
-        if (!tier1Result.isComplete && item.imageUrl.startsWith('data:image')) {
+        if (digitalRate !== null) {
+          tier1Result.data.price = digitalRate;
+          tier1Result.isComplete = true;
+          tier1Result.missingFields = tier1Result.missingFields.filter((f) => f !== 'price');
+        }
+
+        // If price is still missing and image is present, try local Tesseract OCR
+        if (tier1Result.data.price === null && item.imageUrl.startsWith('data:image')) {
           try {
             const localOcrText = await runLocalOcr(item.imageUrl);
             if (localOcrText.trim()) {
               rawOcrText = `${rawOcrText} ${localOcrText}`.trim();
-              tier1Result = parseSuratTextileRegex(rawOcrText);
+              const parsed = parseSuratTextileRegex(rawOcrText);
+              if (tier1Result.data.price === null) tier1Result.data.price = parsed.data.price;
+              if (tier1Result.data.fabric === null) tier1Result.data.fabric = parsed.data.fabric;
+              if (tier1Result.data.code === null) tier1Result.data.code = parsed.data.code;
             }
           } catch {
             // Local OCR failure safely ignored
@@ -402,12 +420,12 @@ export class DataStore {
         }
 
         let finalData = tier1Result.data;
-        let ocrMethod: ProductRecord['ocrMethod'] = 'tier1_regex';
+        let ocrMethod: ProductRecord['ocrMethod'] = digitalRate !== null ? 'tier1_tesseract' : 'tier1_regex';
 
-        if (tier1Result.isComplete) {
+        if (finalData.price !== null) {
           tier1Count++;
         } else {
-          // 4. Tier 2: Gemini Vision fallback for missing/ambiguous fields
+          // 4. Tier 2: Gemini Vision fallback for missing fields
           if (item.imageUrl) {
             try {
               const tier2Result = await parseWithGeminiVision(

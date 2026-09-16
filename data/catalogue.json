@@ -40,7 +40,24 @@
       "source": "ios_share_extension"
     }
   ],
-  "products": [],
+  "products": [
+    {
+      "id": "prod_batch_1789544378109_1",
+      "batchId": "batch_1789544378109",
+      "supplier": "Rg suit",
+      "category": "Suits",
+      "price": 396,
+      "fabric": null,
+      "code": "396",
+      "imageUrl": "/uploads/prod_batch_1789544378109_1_36f09672.jpg",
+      "originalText": "396 Rg suit",
+      "status": "ready",
+      "flaggedReasons": [],
+      "ocrMethod": "tier1_tesseract",
+      "confidence": 1,
+      "createdAt": "2026-09-16T07:39:40.451Z"
+    }
+  ],
   "metrics": {
     "totalImagesProcessed": 1253,
     "tier1FreeCount": 1165,

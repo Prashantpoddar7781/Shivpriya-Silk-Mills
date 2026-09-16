@@ -16,7 +16,7 @@ export interface ProductRecord {
   originalText?: string;
   status: 'ready' | 'needs_review' | 'approved';
   flaggedReasons: string[];
-  ocrMethod: 'tier1_regex' | 'tier2_gemini' | 'manual_edit';
+  ocrMethod: 'tier1_regex' | 'tier1_tesseract' | 'tier2_gemini' | 'manual_edit';
   confidence: number;
   createdAt: string;
   hash?: string;

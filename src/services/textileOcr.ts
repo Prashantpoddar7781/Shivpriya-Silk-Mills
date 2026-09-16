@@ -110,7 +110,10 @@ export function parseSuratTextileRegex(text: string): {
   const codeBlacklist = new Set([
     'BLURRED', 'TORN', 'MISSING', 'UNCLEAR', 'UNKNOWN', 'NONE', 'NULL',
     'RATE', 'PRICE', 'QUALITY', 'SPECIAL', 'FABRIC', 'PHOTO', 'CATALOGUE', 'NEW',
-    'JPG', 'JPEG', 'PNG', 'WEBP'
+    'JPG', 'JPEG', 'PNG', 'WEBP',
+    'SUIT', 'SUITS', 'SAREE', 'SAREES', 'DRESS', 'KURTI', 'KURTIS',
+    'TEXTILE', 'MATERIAL', 'COTTON', 'SILK', 'MILL', 'MILLS',
+    'CREATION', 'CREATIONS', 'FASHION', 'SYNTHETICS', 'WHOLESALE'
   ]);
 
   const codeMatches = [
@@ -194,6 +197,163 @@ async function getTesseractWorker() {
 }
 
 /**
+ * Detects and extracts WhatsApp digital white text overlay (e.g. 396, 375, 400).
+ * Saree and suit photos sent via WhatsApp almost universally have the wholesale rate
+ * typed across the center using WhatsApp's digital text tool in bold white characters.
+ * Because metallic zari embroidery has specular glitter noise that breaks standard Otsu binarization,
+ * this function isolates font-stroke white connected components, cleans the background to pure white,
+ * and feeds crystal-clear black-on-white digits to Tesseract.
+ */
+export async function extractDigitalWholesaleRate(
+  imageSource: Buffer | string
+): Promise<number | null> {
+  try {
+    let rawBuffer: Buffer;
+    if (Buffer.isBuffer(imageSource)) {
+      rawBuffer = imageSource;
+    } else if (typeof imageSource === 'string') {
+      if (imageSource.startsWith('data:image')) {
+        const base64Data = imageSource.split(',')[1] || imageSource;
+        rawBuffer = Buffer.from(base64Data, 'base64');
+      } else if (imageSource.startsWith('/') || imageSource.includes(':\\')) {
+        const fs = await import('fs');
+        const path = await import('path');
+        let resolved = imageSource;
+        if (imageSource.startsWith('/uploads')) {
+          resolved = path.join(process.cwd(), 'data', imageSource);
+        } else if (imageSource.startsWith('/')) {
+          resolved = path.join(process.cwd(), imageSource.replace(/^\//, ''));
+        }
+        if (fs.existsSync(resolved)) {
+          rawBuffer = fs.readFileSync(resolved);
+        } else {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+
+    const jpegMod: any = await import('jpeg-js');
+    const decodeFn = jpegMod.decode || jpegMod.default?.decode;
+    const encodeFn = jpegMod.encode || jpegMod.default?.encode;
+    if (!decodeFn || !encodeFn) return null;
+
+    let decoded;
+    try {
+      decoded = decodeFn(rawBuffer, { useTArray: true });
+    } catch {
+      return null;
+    }
+
+    const w = decoded.width;
+    const h = decoded.height;
+    if (w < 100 || h < 100) return null;
+
+    // Center region where WhatsApp wholesale rates are placed (15% to 85% width, 18% to 82% height)
+    const xStart = Math.floor(w * 0.15);
+    const xEnd = Math.floor(w * 0.85);
+    const yStart = Math.floor(h * 0.18);
+    const yEnd = Math.floor(h * 0.82);
+    const cropW = xEnd - xStart;
+    const cropH = yEnd - yStart;
+
+    const isTextPixel = new Uint8Array(cropW * cropH);
+    for (let y = yStart; y < yEnd; y++) {
+      for (let x = xStart; x < xEnd; x++) {
+        const srcIdx = (y * w + x) * 4;
+        const r = decoded.data[srcIdx];
+        const g = decoded.data[srcIdx + 1];
+        const b = decoded.data[srcIdx + 2];
+        const dstIdx = (y - yStart) * cropW + (x - xStart);
+
+        const maxVal = Math.max(r, g, b);
+        const minVal = Math.min(r, g, b);
+        const diff = maxVal - minVal;
+
+        // WhatsApp white font overlay: bright pixels with low color saturation
+        if (r > 195 && g > 195 && b > 195 && diff < 35) {
+          isTextPixel[dstIdx] = 1;
+        }
+      }
+    }
+
+    // Connected components to isolate large font strokes from tiny embroidery speckles
+    const visited = new Uint8Array(cropW * cropH);
+    const clusters: number[][] = [];
+    for (let y = 0; y < cropH; y++) {
+      for (let x = 0; x < cropW; x++) {
+        const idx = y * cropW + x;
+        if (isTextPixel[idx] && !visited[idx]) {
+          const queue = [idx];
+          visited[idx] = 1;
+          const comp: number[] = [];
+          while (queue.length > 0) {
+            const curr = queue.pop()!;
+            comp.push(curr);
+            const cy = Math.floor(curr / cropW);
+            const cx = curr % cropW;
+            const neighbors = [
+              cy > 0 ? (cy - 1) * cropW + cx : -1,
+              cy < cropH - 1 ? (cy + 1) * cropW + cx : -1,
+              cx > 0 ? cy * cropW + (cx - 1) : -1,
+              cx < cropW - 1 ? cy * cropW + (cx + 1) : -1,
+            ];
+            for (const n of neighbors) {
+              if (n >= 0 && isTextPixel[n] && !visited[n]) {
+                visited[n] = 1;
+                queue.push(n);
+              }
+            }
+          }
+          // WhatsApp digital font strokes have > 160 connected pixels
+          if (comp.length > 160) {
+            clusters.push(comp);
+          }
+        }
+      }
+    }
+
+    if (clusters.length === 0) return null;
+
+    // Render clean black text on white canvas
+    const cleanBuf = Buffer.alloc(cropW * cropH * 4);
+    cleanBuf.fill(255);
+    for (const comp of clusters) {
+      for (const idx of comp) {
+        cleanBuf[idx * 4] = 0;
+        cleanBuf[idx * 4 + 1] = 0;
+        cleanBuf[idx * 4 + 2] = 0;
+        cleanBuf[idx * 4 + 3] = 255;
+      }
+    }
+
+    const encoded = encodeFn({ data: cleanBuf, width: cropW, height: cropH }, 90);
+    const worker = await getTesseractWorker();
+    await worker.setParameters({
+      tessedit_pageseg_mode: '6',
+      tessedit_char_whitelist: '0123456789',
+    });
+
+    const res = await worker.recognize(encoded.data);
+    const text = res.data?.text?.trim() || '';
+    const match = text.match(/\b([1-9]\d{2,3})\b/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num >= 150 && num <= 15000) {
+        return num;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn('extractDigitalWholesaleRate error:', err);
+    return null;
+  }
+}
+
+/**
  * Runs local Tesseract OCR on an image buffer or base64 data.
  * Zero-cost: runs completely in Node.js on the server ($0.00).
  */
@@ -202,6 +362,10 @@ export async function runLocalOcr(
 ): Promise<string> {
   try {
     const worker = await getTesseractWorker();
+    await worker.setParameters({
+      tessedit_pageseg_mode: '3',
+      tessedit_char_whitelist: '',
+    });
     const ret = await worker.recognize(imageSource);
     return ret.data?.text || '';
   } catch (err) {
