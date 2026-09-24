@@ -5,6 +5,15 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { dataStore } from './src/services/dataStore.js';
 import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision } from './src/services/textileOcr.js';
+import multer from 'multer';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 30 * 1024 * 1024, // 30MB per image
+    files: 250, // up to 250 images in a batch
+  },
+});
 
 async function startServer() {
   const app = express();
@@ -39,18 +48,38 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  // 1. Upload batch (called from iOS Share Extension or Web Uploader)
-  app.post('/api/batches/upload', async (req, res) => {
+  // 1. Upload batch (called from iOS Shortcut, iOS Share Extension, or Web Uploader)
+  app.post('/api/batches/upload', upload.any(), async (req, res) => {
     try {
-      const { supplierName, images, source } = req.body;
-      if (!images || !Array.isArray(images) || images.length === 0) {
+      let images: any[] = [];
+      const supplierName = req.body.supplierName || 'Surat Supplier';
+      const source = req.body.source || (req.files && (req.files as any[]).length > 0 ? 'ios_shortcut' : 'web_upload');
+
+      // Case 1: multipart/form-data files (e.g. from Apple Shortcuts or HTML forms)
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        const files = req.files as Express.Multer.File[];
+        images = files.map((file, idx) => {
+          const base64 = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
+          return {
+            id: `shortcut_img_${Date.now()}_${idx + 1}`,
+            imageUrl: base64,
+            category: 'Sarees',
+            textHint: file.originalname || '',
+          };
+        });
+      } else if (req.body.images && Array.isArray(req.body.images)) {
+        // Case 2: JSON payload (from Web Uploader or iOS Share Extension)
+        images = req.body.images;
+      }
+
+      if (images.length === 0) {
         return res.status(400).json({ error: 'Please provide at least 1 image in the batch.' });
       }
 
       const batch = await dataStore.createAndProcessBatch(
-        supplierName || 'Surat Supplier',
+        supplierName,
         images,
-        source || 'ios_share_extension'
+        source
       );
 
       res.status(201).json(batch);
