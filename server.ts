@@ -34,6 +34,26 @@ async function startServer() {
   app.use(express.json({ limit: '250mb' }));
   app.use(express.urlencoded({ extended: true, limit: '250mb' }));
 
+  // Debug request tracker for iOS shortcut inspection
+  const debugLogs: any[] = [];
+  app.use((req, res, next) => {
+    if (req.path.includes('upload') || req.path.includes('batches')) {
+      debugLogs.push({
+        time: new Date().toISOString(),
+        method: req.method,
+        url: req.url,
+        contentType: req.headers['content-type'],
+        userAgent: req.headers['user-agent'],
+      });
+      if (debugLogs.length > 50) debugLogs.shift();
+    }
+    next();
+  });
+
+  app.get('/api/debug-log', (req, res) => {
+    res.json({ logs: debugLogs });
+  });
+
   // Static serving for locally stored uploads (e.g. /uploads/img_xxx.jpg)
   const uploadsPath = path.join(process.cwd(), 'data', 'uploads');
   if (!fs.existsSync(uploadsPath)) {
@@ -52,7 +72,7 @@ async function startServer() {
   app.post('/api/batches/upload', upload.any(), async (req, res) => {
     try {
       let images: any[] = [];
-      const supplierName = req.body.supplierName || 'Surat Supplier';
+      const supplierName = req.body.supplierName || req.body.supplier || req.body['supplier...'] || 'Surat Supplier';
       const source = req.body.source || (req.files && (req.files as any[]).length > 0 ? 'ios_shortcut' : 'web_upload');
 
       // Case 1: multipart/form-data files (e.g. from Apple Shortcuts or HTML forms)
