@@ -47,13 +47,17 @@ const SURAT_FABRICS = [
   'Lycra',
   'Net',
   'Brocade',
-  'Silk'
+  'Silk',
+  'Fenddy',
+  'Fendi',
+  'Fandy',
+  'Fandy Satin'
 ];
 
 /**
  * Tier 1: Zero-cost instant regex parser for Surat textile wholesale text stamps.
- * WhatsApp product photos typically have stamps like:
- * "₹450 | Rayon | R182", "Rate 350/- D.No. 1024 Pure Cotton", "D-998 Price: 620 Quality: Georgette"
+ * WhatsApp product photos typically have stamps or stickers like:
+ * "Fabric fenddy \n Running blouse \n @385", "440@ \n Fandy satan", "₹450 | Rayon | R182", "Rate 350/- D.No. 1024"
  */
 export function parseSuratTextileRegex(text: string): {
   data: ExtractedProductData;
@@ -68,67 +72,65 @@ export function parseSuratTextileRegex(text: string): {
     };
   }
 
-  // Normalize separators and clean whitespace
-  const clean = text
-    .replace(/\r?\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const clean = text.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
 
   let price: number | null = null;
   let fabric: string | null = null;
   let code: string | null = null;
 
-  // 1. Fabric extraction
-  // Match known Surat fabrics (longest match first for multi-word like "Chanderi Cotton")
-  const sortedFabrics = [...SURAT_FABRICS].sort((a, b) => b.length - a.length);
-  for (const f of sortedFabrics) {
-    const fabRegex = new RegExp(`\\b${f.replace(/\s+/g, '\\s+')}\\b`, 'i');
-    if (fabRegex.test(clean)) {
-      fabric = f;
-      break;
+  // 1. Line-by-line Fabric extraction (e.g. "Fabric fenddy", "Quality: Pure Georgette", "Fandy satan")
+  for (const line of lines) {
+    const fabLabelMatch = line.match(/(?:fabric|quality|qly|fab|kapda)[:\s\-]+([A-Za-z0-9\s]+)/i);
+    if (fabLabelMatch && fabLabelMatch[1]) {
+      const words = fabLabelMatch[1].trim().split(/\s+/).filter((w) => {
+        const lower = w.toLowerCase();
+        return !['doy', 'a', 'last', 'the', 'is', 'running', 'blouse', 'blaush', 'runing', 'rate', 'price', 'design', 'code'].includes(lower);
+      });
+      if (words.length > 0) {
+        // e.g. "fenddy" -> "Fenddy"
+        const candidate = words.slice(0, 2).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        if (candidate.length >= 3) {
+          fabric = candidate;
+          break;
+        }
+      }
     }
   }
 
-  // If not in pre-defined list, search for "Quality: XYZ" or "Fabric: XYZ"
+  // If not found via label, match known Surat fabrics (longest match first)
   if (!fabric) {
-    const fabMatch = clean.match(/(?:quality|fabric|qly|fab|kapda)[:\s\-]+([A-Za-z\s]{3,25})/i);
-    if (fabMatch && fabMatch[1]) {
-      const candidate = fabMatch[1].trim();
-      if (
-        !candidate.toLowerCase().includes('rate') &&
-        !candidate.toLowerCase().includes('price') &&
-        !candidate.toLowerCase().includes('design') &&
-        !candidate.toLowerCase().includes('code')
-      ) {
-        fabric = candidate;
+    const sortedFabrics = [...SURAT_FABRICS].sort((a, b) => b.length - a.length);
+    for (const f of sortedFabrics) {
+      const fabRegex = new RegExp(`\\b${f.replace(/\s+/g, '\\s+')}\\b`, 'i');
+      if (fabRegex.test(clean)) {
+        fabric = f;
+        break;
       }
     }
   }
 
   // 2. Product code extraction
-  // Matches: R182, D.No. 1024, D-998, SK-401, RG, Design No: 884, No. 551, CAT-12, K-90, DES-104
   const codeBlacklist = new Set([
     'BLURRED', 'TORN', 'MISSING', 'UNCLEAR', 'UNKNOWN', 'NONE', 'NULL',
     'RATE', 'PRICE', 'QUALITY', 'SPECIAL', 'FABRIC', 'PHOTO', 'CATALOGUE', 'NEW',
     'JPG', 'JPEG', 'PNG', 'WEBP',
     'SUIT', 'SUITS', 'SAREE', 'SAREES', 'DRESS', 'KURTI', 'KURTIS',
     'TEXTILE', 'MATERIAL', 'COTTON', 'SILK', 'MILL', 'MILLS',
-    'CREATION', 'CREATIONS', 'FASHION', 'SYNTHETICS', 'WHOLESALE'
+    'CREATION', 'CREATIONS', 'FASHION', 'SYNTHETICS', 'WHOLESALE',
+    'RUNNING', 'BLOUSE', 'BLAUSH', 'RUNING', 'SAKSHI', 'SEE', 'LAST', 'FENDDY'
   ]);
 
   const codeMatches = [
     /(?:d\.?\s*no\.?|design(?:\s*no\.?)?|art(?:\s*no\.?)?|code|item|d-)\s*[:#\-]?\s*([A-Za-z0-9\-_]{2,14})/i,
     /\b([A-Z]{1,4}[-_]?\d{2,6}[A-Z]?)\b/,
     /(?:^|[|\s])#?([A-Za-z0-9]{3,8})(?:[|\s]|$)/,
-    // Brand/Supplier acronyms printed on fabric (e.g. RG, SK, MK)
-    /\b([A-Z]{2,4})\b/
   ];
 
   for (const regex of codeMatches) {
     const match = clean.match(regex);
     if (match && match[1]) {
       const candidate = match[1].trim().toUpperCase();
-      // Ignore WhatsApp file prefixes like WA0016 or IMG-
       if (
         !codeBlacklist.has(candidate) &&
         !/^WA\d+$/i.test(candidate) &&
@@ -141,28 +143,59 @@ export function parseSuratTextileRegex(text: string): {
     }
   }
 
-  // 3. Price extraction
-  // Matches: ₹450, 450/-, Rate: 450, Rs. 450, Price: 450, Rt-450, 450rs, 450 net, 375
-  const priceMatches = [
-    /(?:₹|rs\.?|inr|rate[:\s\-]*|price[:\s\-]*|rt[:\s\-]*)\s*(\d{3,5})(?:\s*\/\-|\b)/i,
-    /(?<![A-Za-z0-9\-_])(\d{3,5})\s*\/\-/,
-    /(?:^|[|\s,])(\d{3,5})(?:\s*net|\s*fixed)?(?:[|\s,]|$)/i,
-    // Pure standalone 3 to 4 digit numbers (standard wholesale prices between 150 and 9999)
-    /\b([1-9]\d{2,3})\b/
-  ];
+  // 3. Price extraction (Order of priority: explicit rate indicators first!)
+  // Priority 1: @385, @ 385, @385/-, or 440@ (WhatsApp rate tags)
+  for (const line of lines) {
+    const atMatch = line.match(/(?:@\s*([1-9]\d{2,3})|([1-9]\d{2,3})\s*@)(?:\s*\/\-|\b)/);
+    if (atMatch) {
+      const candidateStr = atMatch[1] || atMatch[2];
+      const val = parseInt(candidateStr, 10);
+      if (val >= 150 && val <= 15000) {
+        price = val;
+        break;
+      }
+    }
+  }
 
-  for (const regex of priceMatches) {
-    const match = clean.match(regex);
-    if (match && match[1]) {
-      const p = parseInt(match[1], 10);
-      const strP = String(p);
-      // Ensure the matched price is not actually the product code (e.g. SK-401)
-      if (code && (code === strP || code.includes(`-${strP}`) || code.includes(strP))) {
+  // Priority 2: ₹450, Rate 450, Price 450, Rs. 450, Rt 450
+  if (!price) {
+    for (const line of lines) {
+      const pMatch = line.match(/(?:₹|rs\.?|inr|rate[:\s\-]*|price[:\s\-]*|rt[:\s\-]*)\s*([1-9]\d{2,3})(?:\s*\/\-|\b)/i);
+      if (pMatch) {
+        const val = parseInt(pMatch[1], 10);
+        if (val >= 150 && val <= 15000) {
+          price = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // Priority 3: 450/-, 450 net, 450 fixed
+  if (!price) {
+    for (const line of lines) {
+      const slashMatch = line.match(/(?<![A-Za-z0-9\-_])([1-9]\d{2,3})\s*(?:\/\-|net|fixed)/i);
+      if (slashMatch) {
+        const val = parseInt(slashMatch[1], 10);
+        if (val >= 150 && val <= 15000) {
+          price = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // Priority 4: Standalone 3 to 4 digit number in whole text (between 150 and 9999)
+  if (!price) {
+    const standaloneMatches = clean.matchAll(/\b([1-9]\d{2,3})\b/g);
+    for (const match of standaloneMatches) {
+      const val = parseInt(match[1], 10);
+      const strVal = String(val);
+      if (code && (code === strVal || code.includes(strVal))) {
         continue;
       }
-      // Reasonable wholesale saree/suit range in Surat (₹150 to ₹15,000)
-      if (p >= 150 && p <= 15000) {
-        price = p;
+      if (val >= 150 && val <= 9999) {
+        price = val;
         break;
       }
     }
@@ -338,6 +371,12 @@ export async function extractDigitalWholesaleRate(
     });
 
     const res = await worker.recognize(encoded.data);
+    // Reset worker parameters immediately so they don't bleed into full text OCR
+    await worker.setParameters({
+      tessedit_pageseg_mode: '3',
+      tessedit_char_whitelist: '',
+    });
+
     const text = res.data?.text?.trim() || '';
     const match = text.match(/\b([1-9]\d{2,3})\b/);
     if (match) {

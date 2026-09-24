@@ -403,16 +403,22 @@ export class DataStore {
           tier1Result.missingFields = tier1Result.missingFields.filter((f) => f !== 'price');
         }
 
-        // If price is still missing and image is present, try local Tesseract OCR
-        if (tier1Result.data.price === null && item.imageUrl.startsWith('data:image')) {
+        // If price or fabric is missing and image is present, try local Tesseract OCR
+        if ((tier1Result.data.price === null || tier1Result.data.fabric === null) && (item.imageUrl || finalImageUrl)) {
           try {
-            const localOcrText = await runLocalOcr(item.imageUrl);
+            const localOcrText = await runLocalOcr(finalImageUrl || item.imageUrl);
             if (localOcrText.trim()) {
-              rawOcrText = `${rawOcrText} ${localOcrText}`.trim();
+              rawOcrText = `${rawOcrText}\n${localOcrText}`.trim();
               const parsed = parseSuratTextileRegex(rawOcrText);
-              if (tier1Result.data.price === null) tier1Result.data.price = parsed.data.price;
-              if (tier1Result.data.fabric === null) tier1Result.data.fabric = parsed.data.fabric;
-              if (tier1Result.data.code === null) tier1Result.data.code = parsed.data.code;
+              if (tier1Result.data.price === null && parsed.data.price !== null) {
+                tier1Result.data.price = parsed.data.price;
+              }
+              if (tier1Result.data.fabric === null && parsed.data.fabric !== null) {
+                tier1Result.data.fabric = parsed.data.fabric;
+              }
+              if (tier1Result.data.code === null && parsed.data.code !== null) {
+                tier1Result.data.code = parsed.data.code;
+              }
             }
           } catch {
             // Local OCR failure safely ignored
@@ -451,8 +457,6 @@ export class DataStore {
         }
 
         // 5. Check if father review is required
-        // In wholesale textile photos, fabric and code are often omitted or implied.
-        // Only flag for review if wholesale price is completely missing.
         const flaggedReasons: string[] = [];
         if (finalData.price === null) {
           flaggedReasons.push('Price not found on image');
@@ -496,6 +500,36 @@ export class DataStore {
           this.scheduleSave();
         }
       }
+
+      // Batch-Level Rate & Fabric Inheritance:
+      // When a supplier broadcasts 10-50 saree/suit designs, they are part of a single wholesale collection.
+      // Often only 1 or 2 images have the WhatsApp sticker/tag (@385, Fabric Fenddy).
+      // Any design in the batch missing rate or fabric automatically inherits the collection's details.
+      const batchProducts = this.getBatchProducts(batchId);
+      const detectedBatchPrice = batchProducts.find((p) => p.price !== null)?.price ?? null;
+      const detectedBatchFabric = batchProducts.find((p) => p.fabric !== null)?.fabric ?? null;
+
+      if (detectedBatchPrice !== null || detectedBatchFabric !== null) {
+        for (const p of batchProducts) {
+          let updated = false;
+          if (p.price === null && detectedBatchPrice !== null) {
+            p.price = detectedBatchPrice;
+            p.status = 'ready';
+            p.flaggedReasons = p.flaggedReasons.filter((r) => !r.includes('Price'));
+            updated = true;
+          }
+          if (p.fabric === null && detectedBatchFabric !== null) {
+            p.fabric = detectedBatchFabric;
+            updated = true;
+          }
+          if (updated) {
+            this.products.set(p.id, p);
+          }
+        }
+      }
+
+      this.recalculateBatchCounts(batchId);
+      this.scheduleSave();
 
       newBatch.status = 'completed';
       newBatch.costEstimateUSD = tier2Count * 0.0004;

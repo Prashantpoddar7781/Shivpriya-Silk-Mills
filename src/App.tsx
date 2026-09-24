@@ -21,6 +21,9 @@ import {
   WebUploadModal 
 } from './components/WebUploadModal.js';
 import { 
+  WhatsAppShareGuideModal 
+} from './components/WhatsAppShareGuideModal.js';
+import { 
   AdminDashboard 
 } from './components/AdminDashboard.js';
 import { 
@@ -90,8 +93,30 @@ export default function App() {
   // Modal states
   const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [isShareGuideOpen, setIsShareGuideOpen] = useState<boolean>(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [sharedFiles, setSharedFiles] = useState<File[]>([]);
   const [dbSuppliers, setDbSuppliers] = useState<string[]>([]);
+
+  // Capture PWA install prompt for Android WhatsApp direct share
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleTriggerInstall = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+      }
+    }
+  };
 
   // Load data
   const loadSuppliers = async () => {
@@ -368,6 +393,7 @@ export default function App() {
         setActiveTab={(tab) => setActiveTab(tab)}
         batches={batches}
         onOpenUpload={() => setIsUploadModalOpen(true)}
+        onOpenShareGuide={() => setIsShareGuideOpen(true)}
         needsReviewCount={needsReviewProducts.length}
         onTripleClickLogo={handleTripleClickLogo}
         onExitAdmin={handleExitAdmin}
@@ -376,7 +402,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6">
         
         {/* Tab -1: Dedicated Login Page */}
         {activeTab === 'login' && (
@@ -506,7 +532,7 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3.5 lg:gap-4">
                 {products.map((prod) => (
                   <ProductCard
                     key={prod.id}
@@ -634,6 +660,18 @@ export default function App() {
         }}
         onUploadSuccess={handleBatchCreated}
         initialFiles={sharedFiles}
+        onOpenGuide={() => {
+          setIsUploadModalOpen(false);
+          setIsShareGuideOpen(true);
+        }}
+      />
+
+      {/* WhatsApp Direct Share & Installation Guide Modal */}
+      <WhatsAppShareGuideModal
+        isOpen={isShareGuideOpen}
+        onClose={() => setIsShareGuideOpen(false)}
+        installPrompt={installPrompt}
+        onTriggerInstall={handleTriggerInstall}
       />
 
       {/* Admin Mode Floating Toast Feedback */}

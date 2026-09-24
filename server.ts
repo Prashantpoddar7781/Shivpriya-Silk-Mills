@@ -21,9 +21,9 @@ async function startServer() {
     next();
   });
 
-  // Support high payload for batch image transfers (up to 100 images) from iOS Share Extension
-  app.use(express.json({ limit: '100mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+  // Support ultra-high payload for large batch image transfers (100 to 200+ images) from iOS/Android Share Target
+  app.use(express.json({ limit: '250mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '250mb' }));
 
   // Static serving for locally stored uploads (e.g. /uploads/img_xxx.jpg)
   const uploadsPath = path.join(process.cwd(), 'data', 'uploads');

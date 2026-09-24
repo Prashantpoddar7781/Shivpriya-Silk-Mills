@@ -9,7 +9,8 @@ import {
   LogOut,
   LogIn,
   ShoppingBag,
-  Sparkles
+  Sparkles,
+  Share2
 } from 'lucide-react';
 import { BatchRecord, UserSession } from '../types.js';
 
@@ -20,6 +21,7 @@ interface HeaderProps {
   setActiveTab: (tab: 'catalogue' | 'review' | 'ios_sim' | 'admin_dashboard' | 'login' | 'logout') => void;
   batches: BatchRecord[];
   onOpenUpload: () => void;
+  onOpenShareGuide?: () => void;
   needsReviewCount: number;
   onTripleClickLogo: () => void;
   onExitAdmin: () => void;
@@ -33,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   onOpenUpload,
+  onOpenShareGuide,
   needsReviewCount,
   onTripleClickLogo,
   onExitAdmin,
@@ -175,6 +178,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </nav>
 
+              {/* WhatsApp Direct Share Guide */}
+              {onOpenShareGuide && (
+                <button
+                  id="btn-open-share-guide-admin"
+                  onClick={onOpenShareGuide}
+                  title="Direct WhatsApp Share (No Gallery Save)"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition shadow-2xs cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden md:inline">WhatsApp Share</span>
+                </button>
+              )}
+
               {/* Admin Quick Action: New Batch Upload */}
               <button
                 id="btn-open-upload"
@@ -247,6 +263,18 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Wholesale Live</span>
               </div>
+
+              {onOpenShareGuide && (
+                <button
+                  id="btn-open-share-guide-guest"
+                  onClick={onOpenShareGuide}
+                  title="WhatsApp Direct Sharing Guide"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition shadow-2xs cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden sm:inline">WhatsApp Share</span>
+                </button>
+              )}
 
               {/* Login / Sign In Button */}
               <button
