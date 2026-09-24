@@ -352,7 +352,7 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
               ref={fileInputRef}
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,*/*"
               className="hidden"
               onChange={(e) => handleFilesSelected(e.target.files)}
             />
@@ -365,6 +365,11 @@ export const WebUploadModal: React.FC<WebUploadModalProps> = ({
               Select 10, 50, 100, or 200+ photos. No batch limit.
             </p>
           </div>
+
+          {/* Visibility Tip for Android */}
+          <p className="text-[10px] text-stone-400 px-1 text-center">
+            💡 <em>Photos not showing in picker?</em> If WhatsApp Media Visibility is OFF, turn it back ON in WhatsApp (Chat &rarr; Media visibility &rarr; Yes) to make them selectable.
+          </p>
 
           {/* Previews */}
           {selectedFiles.length > 0 && (
