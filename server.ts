@@ -7,13 +7,74 @@ import { dataStore } from './src/services/dataStore.js';
 import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision } from './src/services/textileOcr.js';
 import multer from 'multer';
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 30 * 1024 * 1024, // 30MB per image
-    files: 250, // up to 250 images in a batch
-  },
-});
+async function parseMultipartBuffer(req: express.Request): Promise<{
+  fields: Record<string, string>;
+  files: Array<{ fieldname: string; filename: string; mimetype: string; buffer: Buffer }>;
+}> {
+  const contentType = req.headers['content-type'] || '';
+  const boundaryMatch = contentType.match(/boundary=([^;]+)/i);
+  if (!boundaryMatch) {
+    return { fields: {}, files: [] };
+  }
+  const boundary = boundaryMatch[1].trim().replace(/^"|"$/g, '');
+  const delim = Buffer.from('--' + boundary);
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(chunk as Buffer);
+  }
+  const full = Buffer.concat(chunks);
+
+  const fields: Record<string, string> = {};
+  const files: Array<{ fieldname: string; filename: string; mimetype: string; buffer: Buffer }> = [];
+
+  let start = 0;
+  while (true) {
+    const idx = full.indexOf(delim, start);
+    if (idx === -1) break;
+    if (start > 0) {
+      const part = full.subarray(start, idx);
+      let sepIdx = part.indexOf(Buffer.from('\r\n\r\n'));
+      let sepLen = 4;
+      if (sepIdx === -1) {
+        sepIdx = part.indexOf(Buffer.from('\n\n'));
+        sepLen = 2;
+      }
+      if (sepIdx !== -1) {
+        const headerStr = part.subarray(0, sepIdx).toString('utf-8');
+        let body = part.subarray(sepIdx + sepLen);
+        if (body.length >= 2 && body[body.length - 2] === 13 && body[body.length - 1] === 10) {
+          body = body.subarray(0, body.length - 2);
+        } else if (body.length >= 1 && body[body.length - 1] === 10) {
+          body = body.subarray(0, body.length - 1);
+        }
+
+        const nameMatch = headerStr.match(/name="([^"]+)"/i) || headerStr.match(/name=([^\s;\r\n]+)/i);
+        const filenameMatch = headerStr.match(/filename="([^"]+)"/i) || headerStr.match(/filename=([^\s;\r\n]+)/i);
+        const typeMatch = headerStr.match(/content-type:\s*([^\s\r\n;]+)/i);
+
+        const fieldname = nameMatch ? nameMatch[1] : '';
+        const filename = filenameMatch ? filenameMatch[1] : '';
+        const mimetype = typeMatch ? typeMatch[1] : '';
+
+        // If filename is present, or image mime, or field is images/files, treat as image file
+        if (filename || mimetype.startsWith('image/') || fieldname === 'images' || fieldname === 'files' || fieldname === 'file') {
+          files.push({
+            fieldname,
+            filename: filename || `image_${files.length + 1}.jpg`,
+            mimetype: mimetype || 'image/jpeg',
+            buffer: body,
+          });
+        } else if (fieldname) {
+          fields[fieldname] = body.toString('utf-8').trim();
+        }
+      }
+    }
+    start = idx + delim.length;
+  }
+
+  return { fields, files };
+}
 
 async function startServer() {
   const app = express();
@@ -30,7 +91,7 @@ async function startServer() {
     next();
   });
 
-  // Support ultra-high payload for large batch image transfers (100 to 200+ images) from iOS/Android Share Target
+  // Support ultra-high payload for JSON batch transfers (from Web Uploader)
   app.use(express.json({ limit: '250mb' }));
   app.use(express.urlencoded({ extended: true, limit: '250mb' }));
 
@@ -69,57 +130,35 @@ async function startServer() {
   });
 
   // 1. Upload batch (called from iOS Shortcut, iOS Share Extension, or Web Uploader)
-  app.post('/api/batches/upload', upload.any(), async (req, res) => {
+  app.post('/api/batches/upload', async (req, res) => {
     try {
       let images: any[] = [];
-      const supplierName = req.body.supplierName || req.body.supplier || req.body['supplier...'] || 'Surat Supplier';
-      const source = req.body.source || (req.files && (req.files as any[]).length > 0 ? 'ios_shortcut' : 'web_upload');
+      let supplierName = req.body?.supplierName || req.body?.supplier || req.body?.['supplier...'] || 'Surat Supplier';
+      let source = req.body?.source || 'web_upload';
 
-      // Case 1: multipart/form-data files (e.g. from Apple Shortcuts or HTML forms)
-      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-        const files = req.files as Express.Multer.File[];
-        images = files.map((file, idx) => {
-          const base64 = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
-          return {
-            id: `shortcut_img_${Date.now()}_${idx + 1}`,
-            imageUrl: base64,
-            category: 'Sarees',
-            textHint: file.originalname || '',
-          };
-        });
-      }
-
-      // Case 2: req.body.images as array of objects or strings
-      if (images.length === 0 && req.body.images) {
-        if (Array.isArray(req.body.images)) {
-          images = req.body.images.map((item: any, idx: number) => {
-            if (typeof item === 'string') {
-              const url = item.startsWith('data:') ? item : `data:image/jpeg;base64,${item}`;
-              return { id: `shortcut_img_${Date.now()}_${idx + 1}`, imageUrl: url, category: 'Sarees' };
-            }
-            return item;
-          });
-        } else if (typeof req.body.images === 'string') {
-          try {
-            const parsed = JSON.parse(req.body.images);
-            if (Array.isArray(parsed)) {
-              images = parsed;
-            }
-          } catch {
-            const url = req.body.images.startsWith('data:') ? req.body.images : `data:image/jpeg;base64,${req.body.images}`;
-            images = [{ id: `shortcut_img_${Date.now()}_1`, imageUrl: url, category: 'Sarees' }];
-          }
+      const isMultipart = (req.headers['content-type'] || '').includes('multipart/form-data');
+      if (isMultipart) {
+        source = 'ios_shortcut';
+        const parsed = await parseMultipartBuffer(req);
+        if (parsed.fields.supplierName || parsed.fields.supplier || parsed.fields['supplier...']) {
+          supplierName = parsed.fields.supplierName || parsed.fields.supplier || parsed.fields['supplier...'];
         }
-      }
 
-      // Case 3: Any field in req.body containing image data (e.g. data:image or base64)
-      if (images.length === 0 && req.body && typeof req.body === 'object') {
-        for (const [key, val] of Object.entries(req.body)) {
-          if (key === 'supplierName' || key === 'supplier' || key === 'source' || key === 'supplier...') continue;
-          if (typeof val === 'string' && (val.startsWith('data:image') || val.length > 500)) {
-            const url = val.startsWith('data:') ? val : `data:image/jpeg;base64,${val}`;
-            images.push({ id: `shortcut_img_${Date.now()}_${images.length + 1}`, imageUrl: url, category: 'Sarees' });
-          }
+        if (parsed.files.length > 0) {
+          images = parsed.files.map((file, idx) => {
+            const base64 = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
+            return {
+              id: `shortcut_img_${Date.now()}_${idx + 1}`,
+              imageUrl: base64,
+              category: 'Sarees',
+              textHint: file.filename || '',
+            };
+          });
+        }
+      } else {
+        // Case 2: JSON payload (from Web Uploader or iOS Share Extension)
+        if (req.body?.images && Array.isArray(req.body.images)) {
+          images = req.body.images;
         }
       }
 
@@ -128,16 +167,13 @@ async function startServer() {
         action: 'batches_upload_attempt',
         supplierName,
         source,
-        filesReceived: req.files ? (req.files as any[]).length : 0,
-        bodyKeys: Object.keys(req.body || {}),
+        isMultipart,
         parsedImagesCount: images.length,
       });
 
       if (images.length === 0) {
         return res.status(400).json({ 
           error: 'No images received. Please ensure the "images" field in your Shortcut is set to "Shortcut Input" (type File).',
-          bodyKeysReceived: Object.keys(req.body || {}),
-          filesCountReceived: req.files ? (req.files as any[]).length : 0
         });
       }
 
