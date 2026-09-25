@@ -87,13 +87,58 @@ async function startServer() {
             textHint: file.originalname || '',
           };
         });
-      } else if (req.body.images && Array.isArray(req.body.images)) {
-        // Case 2: JSON payload (from Web Uploader or iOS Share Extension)
-        images = req.body.images;
       }
 
+      // Case 2: req.body.images as array of objects or strings
+      if (images.length === 0 && req.body.images) {
+        if (Array.isArray(req.body.images)) {
+          images = req.body.images.map((item: any, idx: number) => {
+            if (typeof item === 'string') {
+              const url = item.startsWith('data:') ? item : `data:image/jpeg;base64,${item}`;
+              return { id: `shortcut_img_${Date.now()}_${idx + 1}`, imageUrl: url, category: 'Sarees' };
+            }
+            return item;
+          });
+        } else if (typeof req.body.images === 'string') {
+          try {
+            const parsed = JSON.parse(req.body.images);
+            if (Array.isArray(parsed)) {
+              images = parsed;
+            }
+          } catch {
+            const url = req.body.images.startsWith('data:') ? req.body.images : `data:image/jpeg;base64,${req.body.images}`;
+            images = [{ id: `shortcut_img_${Date.now()}_1`, imageUrl: url, category: 'Sarees' }];
+          }
+        }
+      }
+
+      // Case 3: Any field in req.body containing image data (e.g. data:image or base64)
+      if (images.length === 0 && req.body && typeof req.body === 'object') {
+        for (const [key, val] of Object.entries(req.body)) {
+          if (key === 'supplierName' || key === 'supplier' || key === 'source' || key === 'supplier...') continue;
+          if (typeof val === 'string' && (val.startsWith('data:image') || val.length > 500)) {
+            const url = val.startsWith('data:') ? val : `data:image/jpeg;base64,${val}`;
+            images.push({ id: `shortcut_img_${Date.now()}_${images.length + 1}`, imageUrl: url, category: 'Sarees' });
+          }
+        }
+      }
+
+      debugLogs.push({
+        time: new Date().toISOString(),
+        action: 'batches_upload_attempt',
+        supplierName,
+        source,
+        filesReceived: req.files ? (req.files as any[]).length : 0,
+        bodyKeys: Object.keys(req.body || {}),
+        parsedImagesCount: images.length,
+      });
+
       if (images.length === 0) {
-        return res.status(400).json({ error: 'Please provide at least 1 image in the batch.' });
+        return res.status(400).json({ 
+          error: 'No images received. Please ensure the "images" field in your Shortcut is set to "Shortcut Input" (type File).',
+          bodyKeysReceived: Object.keys(req.body || {}),
+          filesCountReceived: req.files ? (req.files as any[]).length : 0
+        });
       }
 
       const batch = await dataStore.createAndProcessBatch(
@@ -105,6 +150,11 @@ async function startServer() {
       res.status(201).json(batch);
     } catch (err: any) {
       console.error('Batch upload error:', err);
+      debugLogs.push({
+        time: new Date().toISOString(),
+        action: 'batches_upload_error',
+        error: err.message || String(err),
+      });
       res.status(500).json({ error: err.message || 'Failed to create batch' });
     }
   });
