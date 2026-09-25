@@ -379,6 +379,7 @@ async function startServer() {
         method: usedMethod,
         rawOcrText: rawText,
         tier1Attempt: tier1,
+        tier2Result: tier2,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
