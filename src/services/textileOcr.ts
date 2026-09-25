@@ -474,11 +474,15 @@ export async function parseWithGeminiVision(
     let mimeType = 'image/jpeg';
 
     if (imageBase64OrDataUrl.startsWith('data:')) {
-      const match = imageBase64OrDataUrl.match(/^data:([^;]+);base64,(.+)$/);
-      if (match) {
-        mimeType = match[1];
-        base64Data = match[2];
+      const commaIdx = imageBase64OrDataUrl.indexOf(',');
+      if (commaIdx !== -1) {
+        const header = imageBase64OrDataUrl.substring(0, commaIdx);
+        const mimeMatch = header.match(/data:([^;]+)/);
+        if (mimeMatch) mimeType = mimeMatch[1];
+        base64Data = imageBase64OrDataUrl.substring(commaIdx + 1).replace(/\s+/g, '');
       }
+    } else if (!imageBase64OrDataUrl.startsWith('/') && !imageBase64OrDataUrl.startsWith('http') && imageBase64OrDataUrl.length > 500) {
+      base64Data = imageBase64OrDataUrl.replace(/\s+/g, '');
     } else if (imageBase64OrDataUrl.startsWith('/') || imageBase64OrDataUrl.includes(':\\')) {
       const fs = await import('fs');
       const path = await import('path');
@@ -598,10 +602,10 @@ ${textHint && !textHint.match(/\.(jpe?g|png)$/i) ? `Caption Text: "${textHint}"`
     if (data.code === null) missingFields.push('code');
 
     return { data, missingFields };
-  } catch (err) {
-    console.error('Gemini vision fallback error:', err);
+  } catch (err: any) {
+    console.error('Gemini vision fallback error:', err?.message || err);
     // Graceful fallback to regex
     const fallback = parseSuratTextileRegex(textHint || '');
-    return { data: fallback.data, missingFields: fallback.missingFields };
+    return { data: fallback.data, missingFields: fallback.missingFields, error: err?.message };
   }
 }
