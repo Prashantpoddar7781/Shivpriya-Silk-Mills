@@ -363,9 +363,10 @@ async function startServer() {
       const tier1 = parseSuratTextileRegex(rawText);
       let finalData = tier1.data;
 
+      let tier2: any = null;
       // If Tier 1 incomplete and image provided, fall back to Gemini Vision
       if (!tier1.isComplete && imageUrl) {
-        const tier2 = await parseWithGeminiVision(imageUrl, rawText, tier1.data);
+        tier2 = await parseWithGeminiVision(imageUrl, rawText, tier1.data);
         finalData = {
           price: tier1.data.price ?? tier2.data.price,
           fabric: tier1.data.fabric ?? tier2.data.fabric,
