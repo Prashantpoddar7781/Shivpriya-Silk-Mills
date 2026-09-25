@@ -116,7 +116,8 @@ async function startServer() {
   });
 
   // Static serving for locally stored uploads (e.g. /uploads/img_xxx.jpg)
-  const uploadsPath = path.join(process.cwd(), 'data', 'uploads');
+  const dataDirPath = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(process.cwd(), 'data');
+  const uploadsPath = path.join(dataDirPath, 'uploads');
   if (!fs.existsSync(uploadsPath)) {
     fs.mkdirSync(uploadsPath, { recursive: true });
   }
@@ -126,7 +127,14 @@ async function startServer() {
 
   // Health check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', time: new Date().toISOString() });
+    res.json({ 
+      status: 'ok', 
+      time: new Date().toISOString(),
+      productsCount: dataStore.getProducts({}).length,
+      batchesCount: dataStore.getBatches().length,
+      dataDir: dataDirPath,
+      hasVolume: Boolean(process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR),
+    });
   });
 
   // 1. Upload batch (called from iOS Shortcut, iOS Share Extension, or Web Uploader)

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { BatchRecord, CostMetrics, ProductRecord } from '../types.js';
 import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision, extractDigitalWholesaleRate } from './textileOcr.js';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(process.cwd(), 'data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'catalogue.json');
 
