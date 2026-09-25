@@ -5,7 +5,7 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { dataStore } from './src/services/dataStore.js';
 import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision } from './src/services/textileOcr.js';
-import multer from 'multer';
+import AdmZip from 'adm-zip';
 
 async function parseMultipartBuffer(req: express.Request): Promise<{
   fields: Record<string, string>;
@@ -145,15 +145,60 @@ async function startServer() {
         }
 
         if (parsed.files.length > 0) {
-          images = parsed.files.map((file, idx) => {
-            const base64 = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
-            return {
-              id: `shortcut_img_${Date.now()}_${idx + 1}`,
-              imageUrl: base64,
-              category: 'Sarees',
-              textHint: file.filename || '',
-            };
-          });
+          for (const file of parsed.files) {
+            // Check if file is a ZIP archive (by magic bytes PK\x03\x04 or extension/mime)
+            const isZip =
+              (file.buffer.length >= 4 &&
+                file.buffer[0] === 0x50 &&
+                file.buffer[1] === 0x4b &&
+                file.buffer[2] === 0x03 &&
+                file.buffer[3] === 0x04) ||
+              file.filename.toLowerCase().endsWith('.zip') ||
+              file.mimetype.includes('zip');
+
+            if (isZip) {
+              try {
+                const zip = new AdmZip(file.buffer);
+                const entries = zip.getEntries();
+                for (const entry of entries) {
+                  if (entry.isDirectory) continue;
+                  const entryName = entry.entryName.toLowerCase();
+                  if (entryName.includes('__macosx') || entryName.startsWith('.') || entryName.includes('/.')) continue;
+                  if (
+                    entryName.endsWith('.jpg') ||
+                    entryName.endsWith('.jpeg') ||
+                    entryName.endsWith('.png') ||
+                    entryName.endsWith('.webp') ||
+                    entryName.endsWith('.heic')
+                  ) {
+                    const entryBuf = entry.getData();
+                    const mime = entryName.endsWith('.png')
+                      ? 'image/png'
+                      : entryName.endsWith('.webp')
+                      ? 'image/webp'
+                      : 'image/jpeg';
+                    images.push({
+                      id: `shortcut_img_${Date.now()}_${images.length + 1}`,
+                      imageUrl: `data:${mime};base64,${entryBuf.toString('base64')}`,
+                      category: 'Sarees',
+                      textHint: '',
+                    });
+                  }
+                }
+              } catch (zErr) {
+                console.error('Failed to unpack zip file from Shortcut:', zErr);
+              }
+            } else {
+              // Regular image file
+              const base64 = `data:${file.mimetype || 'image/jpeg'};base64,${file.buffer.toString('base64')}`;
+              images.push({
+                id: `shortcut_img_${Date.now()}_${images.length + 1}`,
+                imageUrl: base64,
+                category: 'Sarees',
+                textHint: '',
+              });
+            }
+          }
         }
       } else {
         // Case 2: JSON payload (from Web Uploader or iOS Share Extension)

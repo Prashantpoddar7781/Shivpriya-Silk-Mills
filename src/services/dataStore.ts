@@ -395,6 +395,16 @@ export class DataStore {
         }
 
         let rawOcrText = item.textHint || '';
+        // If rawOcrText is a filename or camera identifier, discard it
+        if (
+          rawOcrText.match(/\.(jpe?g|png|webp|heic)$/i) ||
+          rawOcrText.startsWith('PHOTO-') ||
+          rawOcrText.startsWith('IMG-') ||
+          rawOcrText.startsWith('WA')
+        ) {
+          rawOcrText = '';
+        }
+
         let tier1Result = parseSuratTextileRegex(rawOcrText);
 
         if (digitalRate !== null) {
@@ -403,53 +413,41 @@ export class DataStore {
           tier1Result.missingFields = tier1Result.missingFields.filter((f) => f !== 'price');
         }
 
-        // If price or fabric is missing and image is present, try local Tesseract OCR
-        if ((tier1Result.data.price === null || tier1Result.data.fabric === null) && (item.imageUrl || finalImageUrl)) {
+        let finalData = { ...tier1Result.data };
+        let ocrMethod: ProductRecord['ocrMethod'] = digitalRate !== null ? 'tier1_tesseract' : 'tier1_regex';
+
+        // High accuracy: If image is present and fields (especially price or fabric) are not fully confirmed,
+        // run Gemini 2.5 Flash for high-precision physical stamp extraction
+        const imageToInspect = item.imageUrl || finalImageUrl;
+        if (imageToInspect && (finalData.price === null || finalData.fabric === null)) {
           try {
-            const localOcrText = await runLocalOcr(finalImageUrl || item.imageUrl);
-            if (localOcrText.trim()) {
-              rawOcrText = `${rawOcrText}\n${localOcrText}`.trim();
-              const parsed = parseSuratTextileRegex(rawOcrText);
-              if (tier1Result.data.price === null && parsed.data.price !== null) {
-                tier1Result.data.price = parsed.data.price;
-              }
-              if (tier1Result.data.fabric === null && parsed.data.fabric !== null) {
-                tier1Result.data.fabric = parsed.data.fabric;
-              }
-              if (tier1Result.data.code === null && parsed.data.code !== null) {
-                tier1Result.data.code = parsed.data.code;
-              }
+            const tier2Result = await parseWithGeminiVision(
+              imageToInspect,
+              rawOcrText,
+              finalData
+            );
+            if (tier2Result.data.price !== null) {
+              finalData.price = tier2Result.data.price;
             }
-          } catch {
-            // Local OCR failure safely ignored
+            if (tier2Result.data.fabric !== null) {
+              finalData.fabric = tier2Result.data.fabric;
+            }
+            if (tier2Result.data.code !== null) {
+              finalData.code = tier2Result.data.code;
+            }
+            ocrMethod = 'tier2_gemini';
+            tier2Count++;
+            newBatch.costEstimateUSD += 0.0001;
+            this.metrics.tier2GeminiCount++;
+            this.metrics.totalCostUSD += 0.0001;
+          } catch (e) {
+            console.warn('Gemini vision error:', e);
           }
         }
 
-        let finalData = tier1Result.data;
-        let ocrMethod: ProductRecord['ocrMethod'] = digitalRate !== null ? 'tier1_tesseract' : 'tier1_regex';
-
-        if (finalData.price !== null) {
+        if (ocrMethod !== 'tier2_gemini') {
           tier1Count++;
-        } else {
-          // 4. Tier 2: Gemini Vision fallback for missing fields
-          if (item.imageUrl) {
-            try {
-              const tier2Result = await parseWithGeminiVision(
-                item.imageUrl,
-                rawOcrText,
-                tier1Result.data
-              );
-              finalData = {
-                price: tier1Result.data.price ?? tier2Result.data.price,
-                fabric: tier1Result.data.fabric ?? tier2Result.data.fabric,
-                code: tier1Result.data.code ?? tier2Result.data.code,
-              };
-              ocrMethod = 'tier2_gemini';
-              tier2Count++;
-            } catch {
-              finalData = tier1Result.data;
-            }
-          }
+          this.metrics.tier1FreeCount++;
         }
 
         if (typeof item.price === 'number' && item.price > 0) {

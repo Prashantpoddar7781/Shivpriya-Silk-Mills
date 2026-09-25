@@ -72,6 +72,21 @@ export function parseSuratTextileRegex(text: string): {
     };
   }
 
+  // Reject strings that are just filenames or camera identifiers
+  const trimmed = text.trim();
+  if (
+    /\.(jpe?g|png|webp|heic)$/i.test(trimmed) ||
+    /^PHOTO-\d/i.test(trimmed) ||
+    /^IMG[-_]\d/i.test(trimmed) ||
+    /^WA\d+/i.test(trimmed)
+  ) {
+    return {
+      data: { price: null, fabric: null, code: null },
+      isComplete: false,
+      missingFields: ['price', 'fabric', 'code'],
+    };
+  }
+
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const clean = text.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -192,6 +207,10 @@ export function parseSuratTextileRegex(text: string): {
       const val = parseInt(match[1], 10);
       const strVal = String(val);
       if (code && (code === strVal || code.includes(strVal))) {
+        continue;
+      }
+      // Never treat calendar years (2020-2035) as prices in standalone matches
+      if (val >= 2020 && val <= 2035) {
         continue;
       }
       if (val >= 150 && val <= 9999) {
@@ -451,7 +470,7 @@ export async function parseWithGeminiVision(
   }
 
   try {
-    let base64Data = imageBase64OrDataUrl;
+    let base64Data = '';
     let mimeType = 'image/jpeg';
 
     if (imageBase64OrDataUrl.startsWith('data:')) {
@@ -460,28 +479,58 @@ export async function parseWithGeminiVision(
         mimeType = match[1];
         base64Data = match[2];
       }
+    } else if (imageBase64OrDataUrl.startsWith('/') || imageBase64OrDataUrl.includes(':\\')) {
+      const fs = await import('fs');
+      const path = await import('path');
+      let resolved = imageBase64OrDataUrl;
+      if (imageBase64OrDataUrl.startsWith('/uploads')) {
+        resolved = path.join(process.cwd(), 'data', imageBase64OrDataUrl);
+      } else if (imageBase64OrDataUrl.startsWith('/')) {
+        resolved = path.join(process.cwd(), imageBase64OrDataUrl.replace(/^\//, ''));
+      }
+      if (fs.existsSync(resolved)) {
+        const buf = fs.readFileSync(resolved);
+        base64Data = buf.toString('base64');
+      }
+    } else if (imageBase64OrDataUrl.startsWith('http://') || imageBase64OrDataUrl.startsWith('https://')) {
+      try {
+        const resp = await fetch(imageBase64OrDataUrl);
+        const arrBuf = await resp.arrayBuffer();
+        base64Data = Buffer.from(arrBuf).toString('base64');
+      } catch (err) {
+        console.warn('Failed to fetch image URL for Gemini Vision:', err);
+      }
     }
 
-    const prompt = `You are a strict OCR extractor for Surat wholesale textile product images (sarees, suits, dress materials).
-The image contains wholesale product details stamped or printed on the fabric or paper tag.
-Extract ONLY the physical printed text on the image for these 3 fields:
-- "price": Wholesale price/rate in INR as an integer (e.g. 450). Return null if not written.
-- "fabric": Fabric/quality name (e.g. "Rayon", "Pure Georgette", "Dola Silk", "Cotton"). Return null if not written.
-- "code": Design code / Product number / D.No. (e.g. "R182", "D-104", "1024"). Return null if not written.
+    const prompt = `You are a precision OCR extractor for Surat wholesale textile product images (sarees, suits, dress materials, kurtis).
+The image contains wholesale product details stamped, stickered, or printed on the fabric, cellophane packaging, or paper tag.
+Typical examples of stamps:
+- "390/- fendy running blouse necklace" -> price: 390, fabric: "Fendy", code: "running blouse necklace"
+- "440@ Fandy satin" -> price: 440, fabric: "Fandy Satin", code: null
+- "Rate 350/- D.No. 1024" -> price: 350, fabric: null, code: "1024"
+- "Fabric Dola Silk @550" -> price: 550, fabric: "Dola Silk", code: null
+- "₹450 | Rayon | R182" -> price: 450, fabric: "Rayon", code: "R182"
+
+Common Surat wholesale fabrics include:
+Fendy, Fenddy, Fandy, Dola Silk, Pure Georgette, Georgette, Cotton, Rayon, Organza, Chiffon, Bandhani, Satin, Roman Silk, Chanderi, Crepe, Tissue, Soft Silk, Banarasi, Jacquard.
+
+Extract ONLY the physical printed/stickered text on the image for these 3 fields:
+- "price": Wholesale price/rate in INR as an integer (e.g. 390 for "390/-", 440 for "440@", 350 for "Rate 350"). Must be between 100 and 15000. Do NOT return calendar years (such as 2024, 2025, 2026). Return null if no price is written on the image.
+- "fabric": Fabric/quality name (e.g. "Fendy", "Dola Silk", "Georgette"). Return null if not written.
+- "code": Design code / Product number / D.No. / pattern name (e.g. "R182", "D-104", "1024", "running blouse necklace"). Return null if not written.
 
 RULES:
-- Maximum 3 fields: price, fabric, code.
-- Do NOT guess or infer additional product details.
-- If a field is not physically visible or is missing, return null. Never hallucinate.
+- Never hallucinate.
+- Return null for any field not visibly present on the image.
 ${partialData?.price ? `Known Price: ₹${partialData.price}` : ''}
 ${partialData?.fabric ? `Known Fabric: "${partialData.fabric}"` : ''}
 ${partialData?.code ? `Known Code: "${partialData.code}"` : ''}
-${textHint ? `OCR Text Detected: "${textHint}"` : ''}`;
+${textHint && !textHint.match(/\.(jpe?g|png)$/i) ? `Caption Text: "${textHint}"` : ''}`;
 
     const parts: any[] = [{ text: prompt }];
 
     // If valid base64 payload provided
-    if (base64Data && base64Data.length > 100 && !base64Data.startsWith('http')) {
+    if (base64Data && base64Data.length > 100) {
       parts.unshift({
         inlineData: {
           mimeType,
@@ -523,10 +572,24 @@ ${textHint ? `OCR Text Detected: "${textHint}"` : ''}`;
     }
 
     const parsed = JSON.parse(text);
+    let extractedPrice: number | null = null;
+    if (typeof parsed.price === 'number' && parsed.price >= 100 && parsed.price <= 20000) {
+      if (parsed.price !== 2024 && parsed.price !== 2025 && parsed.price !== 2026 && parsed.price !== 2027) {
+        extractedPrice = parsed.price;
+      }
+    }
+
+    const cleanStr = (val: any): string | null => {
+      if (typeof val === 'string' && val.trim() && val.trim().toLowerCase() !== 'null' && val.trim().toLowerCase() !== 'undefined') {
+        return val.trim();
+      }
+      return null;
+    };
+
     const data: ExtractedProductData = {
-      price: typeof parsed.price === 'number' ? parsed.price : (partialData?.price ?? null),
-      fabric: typeof parsed.fabric === 'string' && parsed.fabric.trim() ? parsed.fabric.trim() : (partialData?.fabric ?? null),
-      code: typeof parsed.code === 'string' && parsed.code.trim() ? parsed.code.trim() : (partialData?.code ?? null),
+      price: extractedPrice ?? (partialData?.price ?? null),
+      fabric: cleanStr(parsed.fabric) ?? (partialData?.fabric ?? null),
+      code: cleanStr(parsed.code) ?? (partialData?.code ?? null),
     };
 
     const missingFields: string[] = [];
