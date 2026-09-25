@@ -30,104 +30,81 @@ export const BatchProcessingBanner: React.FC<BatchProcessingBannerProps> = ({
     : 100;
 
   return (
-    <div className="mb-6 bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 text-white rounded-2xl p-4 sm:p-5 shadow-sm border border-stone-800">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="mb-3 sm:mb-5 bg-gradient-to-r from-stone-900 to-stone-850 text-white rounded-2xl p-3 sm:p-4 shadow-sm border border-stone-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         
-        {/* Left Side: Summary & Counts */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              {batch.source === 'ios_share_extension' ? 'WhatsApp Shared Batch' : 'New Collection Batch'}
+        {/* Left Side: Summary */}
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              {batch.source === 'ios_shortcut' ? 'WhatsApp Batch' : 'Batch Upload'}
             </span>
-            <span className="text-xs text-stone-400">
-              {new Date(batch.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} • Supplier:
+            <span className="text-xs text-stone-300 font-bold truncate">
+              {batch.supplierName}
             </span>
-            <strong className="text-sm font-semibold text-amber-100">{batch.supplierName}</strong>
+            <span className="text-xs text-stone-500">
+              ({batch.totalImages} designs)
+            </span>
           </div>
 
-          {/* Workflow Header */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
-              {batch.totalImages} designs received from {batch.supplierName}
-            </h2>
-          </div>
-
-          {/* Result Metric Badges */}
-          <div className="flex items-center gap-3 pt-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 text-xs font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{batch.readyCount} ready for buyers</span>
-            </div>
+          <div className="flex items-center gap-2 pt-1.5 flex-wrap text-xs font-semibold">
+            <span className="inline-flex items-center gap-1 text-emerald-400">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>{batch.readyCount} Ready</span>
+            </span>
 
             {batch.reviewCount > 0 && (
-              <>
-                <div className="text-stone-500 font-bold">·</div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/60">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{batch.reviewCount} need review</span>
-                </div>
-              </>
-            )}
-
-            {batch.reviewCount === 0 && (
-              <>
-                <div className="text-stone-500 font-bold">·</div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-300">
-                  <PackageCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>All designs ready &amp; active</span>
-                </div>
-              </>
+              <span className="inline-flex items-center gap-1 text-amber-400">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>{batch.reviewCount} Need Review</span>
+              </span>
             )}
           </div>
         </div>
 
-        {/* Right Side: Actions */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Right Side: Quick Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
           {batch.reviewCount > 0 && (
             <button
-              id="btn-banner-review-flagged"
               onClick={onFilterReviewOnly}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-amber-500 hover:bg-amber-600 text-stone-950 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-stone-950 transition cursor-pointer active:scale-95"
             >
-              <AlertTriangle className="w-4 h-4" />
-              <span>Review {batch.reviewCount} Items</span>
-              <ArrowRight className="w-4 h-4" />
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Review ({batch.reviewCount})</span>
             </button>
           )}
 
           {batch.readyCount > 0 && (
             <button
-              id="btn-banner-bulk-approve"
               onClick={() => onBulkApprove(batch.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition cursor-pointer"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer active:scale-95"
             >
-              <CheckCheck className="w-4 h-4 text-emerald-400" />
+              <CheckCheck className="w-3.5 h-3.5" />
               <span>Approve All Ready</span>
             </button>
           )}
 
           <button
-            id="btn-banner-view-batch"
             onClick={onViewAllBatch}
-            className="px-3 py-2 text-xs text-stone-400 hover:text-white transition cursor-pointer"
+            className="px-2.5 py-1.5 text-xs text-stone-400 hover:text-white transition cursor-pointer font-medium"
           >
-            View All ({batch.totalImages})
+            View
           </button>
         </div>
 
       </div>
 
-      {/* Progress bar if still running */}
+      {/* Progress bar if still running in background */}
       {!isComplete && (
-        <div className="mt-4 pt-3 border-t border-stone-800">
-          <div className="flex items-center justify-between text-xs text-stone-400 mb-1">
+        <div className="mt-2.5 pt-2 border-t border-stone-800">
+          <div className="flex items-center justify-between text-[11px] text-stone-400 mb-1">
             <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-              Organizing designs ({batch.processedCount}/{batch.totalImages})...
+              <Clock className="w-3 h-3 text-amber-400 animate-spin" />
+              Processing ({batch.processedCount}/{batch.totalImages})...
             </span>
-            <span className="font-semibold">{progressPct}%</span>
+            <span className="font-bold">{progressPct}%</span>
           </div>
-          <div className="w-full h-1.5 bg-stone-800 rounded-full overflow-hidden">
+          <div className="w-full h-1 bg-stone-800 rounded-full overflow-hidden">
             <div 
               className="h-full bg-amber-500 transition-all duration-300 rounded-full"
               style={{ width: `${progressPct}%` }}

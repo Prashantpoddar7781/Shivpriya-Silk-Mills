@@ -76,16 +76,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       onKeyDown={handleKeyDown}
     >
       <div 
-        className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-200 flex flex-col md:flex-row max-h-[90vh]"
+        className="bg-white rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl border border-stone-200 flex flex-col md:flex-row max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left: Product Image & OCR Text Stamp */}
-        <div className="md:w-1/2 bg-stone-100 p-4 flex flex-col justify-between border-b md:border-b-0 md:border-r border-stone-200">
-          <div className="relative aspect-4/5 rounded-xl overflow-hidden bg-stone-200 shadow-inner">
+        <div className="w-full md:w-1/2 bg-stone-100 p-3 sm:p-4 flex flex-row md:flex-col gap-2.5 sm:gap-3 border-b md:border-b-0 md:border-r border-stone-200 shrink-0">
+          <div className="relative w-24 h-28 sm:w-32 sm:h-36 md:w-full md:h-auto md:aspect-4/5 rounded-xl overflow-hidden bg-stone-200 shadow-inner shrink-0">
             <img 
               src={getMediaUrl(product.imageUrl)} 
               alt={product.code || 'Textile Design'} 
@@ -93,27 +93,27 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             />
             
             {/* Status indicator on image */}
-            <div className="absolute top-2 left-2">
-              <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+            <div className="absolute top-1.5 left-1.5">
+              <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold ${
                 product.status === 'needs_review' 
                   ? 'bg-amber-500 text-white' 
                   : 'bg-emerald-600 text-white'
               }`}>
-                {product.status === 'needs_review' ? 'Needs Review' : 'Ready'}
+                {product.status === 'needs_review' ? 'Review' : 'Ready'}
               </span>
             </div>
           </div>
 
           {/* Raw Text Detected */}
-          <div className="mt-3 p-2.5 bg-white rounded-lg border border-stone-200 text-xs">
-            <p className="text-stone-400 font-medium mb-0.5">Raw Text / Stamp Detected:</p>
-            <p className="font-mono text-stone-800 text-[11px] bg-stone-50 p-1.5 rounded border border-stone-100 truncate">
+          <div className="flex-1 p-2 sm:p-2.5 bg-white rounded-lg border border-stone-200 text-xs min-w-0 flex flex-col justify-center">
+            <p className="text-stone-400 font-medium text-[10px] sm:text-xs mb-0.5">Detected Stamp / Text:</p>
+            <p className="font-mono text-stone-800 text-[10px] sm:text-[11px] bg-stone-50 p-1.5 rounded border border-stone-100 truncate">
               {product.originalText || 'No clear text stamp found'}
             </p>
             {product.flaggedReasons && product.flaggedReasons.length > 0 && (
-              <div className="mt-1 text-amber-700 flex items-center gap-1 font-medium text-[11px]">
+              <div className="mt-1 text-amber-700 flex items-center gap-1 font-medium text-[10px] sm:text-[11px]">
                 <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                <span>Flag: {product.flaggedReasons.join(', ')}</span>
+                <span className="truncate">Flag: {product.flaggedReasons.join(', ')}</span>
               </div>
             )}
           </div>

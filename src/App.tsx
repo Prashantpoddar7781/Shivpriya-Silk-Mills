@@ -402,7 +402,7 @@ export default function App() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-6 pb-28 md:pb-6">
         
         {/* Tab -1: Dedicated Login Page */}
         {activeTab === 'login' && (
@@ -683,7 +683,7 @@ export default function App() {
       )}
 
       {/* Clean Aesthetic Footer */}
-      <footer className="border-t border-stone-200 bg-white py-6 mt-12 text-xs text-stone-500">
+      <footer className="border-t border-stone-200 bg-white py-6 mt-12 mb-20 md:mb-0 text-xs text-stone-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-stone-700">Surat Textile B2B Wholesale Catalogue</span>
@@ -695,6 +695,106 @@ export default function App() {
           </p>
         </div>
       </footer>
+
+      {/* Mobile Bottom Navigation Bar (Thumb-Friendly, Fixed Bottom on Mobile Only) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 px-3">
+        <div className="flex items-center justify-around max-w-md mx-auto">
+          {/* 1. Catalogue */}
+          <button
+            id="mobile-nav-catalogue"
+            onClick={() => setActiveTab('catalogue')}
+            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer active:scale-95 ${
+              activeTab === 'catalogue'
+                ? 'text-amber-700 font-bold'
+                : 'text-stone-500 hover:text-stone-900 font-medium'
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl transition-colors ${activeTab === 'catalogue' ? 'bg-amber-100/80 text-amber-800' : ''}`}>
+              <Layers className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <span className="text-[10px] tracking-tight">Catalogue</span>
+          </button>
+
+          {/* 2. Review (Admin mode) OR WhatsApp Guide (Buyer mode) */}
+          {isAdmin ? (
+            <button
+              id="mobile-nav-review"
+              onClick={() => setActiveTab('review')}
+              className={`relative flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer active:scale-95 ${
+                activeTab === 'review'
+                  ? 'text-amber-700 font-bold'
+                  : 'text-stone-500 hover:text-stone-900 font-medium'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl relative transition-colors ${activeTab === 'review' ? 'bg-amber-100/80 text-amber-800' : ''}`}>
+                <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
+                {needsReviewProducts.length > 0 && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-stone-950 font-black text-[9px] flex items-center justify-center shadow-xs">
+                    {needsReviewProducts.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] tracking-tight">Review</span>
+            </button>
+          ) : (
+            <button
+              id="mobile-nav-wa-guide"
+              onClick={() => setIsShareGuideOpen(true)}
+              className="flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-stone-500 hover:text-stone-900 font-medium transition cursor-pointer active:scale-95"
+            >
+              <div className="p-1.5 rounded-xl">
+                <Share2 className="w-5 h-5 stroke-[2.2] text-[#25D366]" />
+              </div>
+              <span className="text-[10px] tracking-tight">Share Guide</span>
+            </button>
+          )}
+
+          {/* 3. Floating Central Upload Button */}
+          <button
+            id="mobile-nav-upload"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="flex flex-col items-center -mt-5 cursor-pointer group active:scale-95 transition-transform"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-700 via-amber-600 to-amber-500 text-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-all">
+              <UploadCloud className="w-6 h-6 stroke-[2.5]" />
+            </div>
+            <span className="text-[10px] font-bold text-stone-700 mt-1">Upload</span>
+          </button>
+
+          {/* 4. Admin Desk OR Login */}
+          {isAdmin ? (
+            <button
+              id="mobile-nav-admin-desk"
+              onClick={() => setActiveTab('admin_dashboard')}
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer active:scale-95 ${
+                activeTab === 'admin_dashboard'
+                  ? 'text-amber-700 font-bold'
+                  : 'text-stone-500 hover:text-stone-900 font-medium'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl transition-colors ${activeTab === 'admin_dashboard' ? 'bg-amber-100/80 text-amber-800' : ''}`}>
+                <LayoutDashboard className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <span className="text-[10px] tracking-tight">Admin Desk</span>
+            </button>
+          ) : (
+            <button
+              id="mobile-nav-login"
+              onClick={() => setActiveTab('login')}
+              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition cursor-pointer active:scale-95 ${
+                activeTab === 'login'
+                  ? 'text-amber-700 font-bold'
+                  : 'text-stone-500 hover:text-stone-900 font-medium'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl transition-colors ${activeTab === 'login' ? 'bg-amber-100/80 text-amber-800' : ''}`}>
+                <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <span className="text-[10px] tracking-tight">Login</span>
+            </button>
+          )}
+        </div>
+      </nav>
 
     </div>
   );
