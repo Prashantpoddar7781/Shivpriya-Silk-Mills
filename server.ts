@@ -213,6 +213,18 @@ async function startServer() {
         supplierName,
         source,
         isMultipart,
+        parsedFiles: parsed.files.map((f) => ({
+          filename: f.filename,
+          fieldname: f.fieldname,
+          size: f.buffer.length,
+          isZip:
+            (f.buffer.length >= 4 &&
+              f.buffer[0] === 0x50 &&
+              f.buffer[1] === 0x4b &&
+              f.buffer[2] === 0x03 &&
+              f.buffer[3] === 0x04) ||
+            f.filename.toLowerCase().endsWith('.zip'),
+        })),
         parsedImagesCount: images.length,
       });
 
