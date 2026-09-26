@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { dataStore } from './src/services/dataStore.js';
 import { parseSuratTextileRegex, runLocalOcr, parseWithGeminiVision } from './src/services/textileOcr.js';
 import AdmZip from 'adm-zip';
+import { WhatsAppBotService } from './src/services/whatsappBot.js';
 
 async function parseMultipartBuffer(req: express.Request): Promise<{
   fields: Record<string, string>;
@@ -134,7 +135,32 @@ async function startServer() {
       batchesCount: dataStore.getBatches().length,
       dataDir: dataDirPath,
       hasVolume: Boolean(process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR),
+      whatsappConnected: whatsappBot.getStatus().isConnected,
     });
+  });
+
+  // --- WhatsApp Bot Endpoints for Android Forwarding ---
+  const whatsappBot = new WhatsAppBotService(dataStore);
+  whatsappBot.start().catch((err) => console.error('[WhatsApp Bot] Boot error:', err));
+
+  app.get('/api/whatsapp/status', (req, res) => {
+    res.json(whatsappBot.getStatus());
+  });
+
+  app.post('/api/whatsapp/start', async (req, res) => {
+    await whatsappBot.start();
+    res.json(whatsappBot.getStatus());
+  });
+
+  app.post('/api/whatsapp/logout', async (req, res) => {
+    await whatsappBot.logout();
+    res.json(whatsappBot.getStatus());
+  });
+
+  app.post('/api/whatsapp/set-supplier', (req, res) => {
+    const { supplier } = req.body;
+    const updated = whatsappBot.setSupplier(supplier);
+    res.json({ supplier: updated, status: whatsappBot.getStatus() });
   });
 
   // 1. Upload batch (called from iOS Shortcut, iOS Share Extension, or Web Uploader)

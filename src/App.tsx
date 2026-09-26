@@ -24,6 +24,9 @@ import {
   WhatsAppShareGuideModal 
 } from './components/WhatsAppShareGuideModal.js';
 import { 
+  WhatsAppBotConnectModal 
+} from './components/WhatsAppBotConnectModal.js';
+import { 
   AdminDashboard 
 } from './components/AdminDashboard.js';
 import { 
@@ -94,6 +97,7 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState<ProductRecord | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [isShareGuideOpen, setIsShareGuideOpen] = useState<boolean>(false);
+  const [isWhatsAppBotModalOpen, setIsWhatsAppBotModalOpen] = useState<boolean>(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [sharedFiles, setSharedFiles] = useState<File[]>([]);
   const [dbSuppliers, setDbSuppliers] = useState<string[]>([]);
@@ -428,6 +432,7 @@ export default function App() {
             onOpenUpload={() => setIsUploadModalOpen(true)}
             onGoToReview={() => setActiveTab('review')}
             onGoToWhatsAppImport={() => setActiveTab('ios_sim')}
+            onOpenWhatsAppBot={() => setIsWhatsAppBotModalOpen(true)}
             onGoToCatalogue={() => setActiveTab('catalogue')}
             onExitAdmin={handleExitAdmin}
             onTriggerLogout={handleTriggerLogout}
@@ -672,6 +677,12 @@ export default function App() {
         onClose={() => setIsShareGuideOpen(false)}
         installPrompt={installPrompt}
         onTriggerInstall={handleTriggerInstall}
+      />
+
+      {/* WhatsApp Linked Device Bot Connect Modal */}
+      <WhatsAppBotConnectModal
+        isOpen={isWhatsAppBotModalOpen}
+        onClose={() => setIsWhatsAppBotModalOpen(false)}
       />
 
       {/* Admin Mode Floating Toast Feedback */}

@@ -11,7 +11,8 @@ import {
   Clock, 
   CheckCheck,
   Package,
-  FileCheck
+  FileCheck,
+  MessageSquare
 } from 'lucide-react';
 import { BatchRecord } from '../types.js';
 
@@ -19,6 +20,7 @@ interface AdminDashboardProps {
   onOpenUpload: () => void;
   onGoToReview: () => void;
   onGoToWhatsAppImport: () => void;
+  onOpenWhatsAppBot?: () => void;
   onGoToCatalogue: () => void;
   onExitAdmin: () => void;
   onTriggerLogout?: () => void;
@@ -32,6 +34,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenUpload,
   onGoToReview,
   onGoToWhatsAppImport,
+  onOpenWhatsAppBot,
   onGoToCatalogue,
   onExitAdmin,
   onTriggerLogout,
@@ -191,24 +194,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Action 3: WhatsApp Batch Simulator */}
+          {/* Action 3: WhatsApp Forwarding Bot for Android */}
           <div 
-            onClick={onGoToWhatsAppImport}
-            className="group bg-white rounded-2xl border border-stone-200 p-5 shadow-xs hover:border-amber-500 hover:shadow-md transition cursor-pointer flex flex-col justify-between"
+            onClick={onOpenWhatsAppBot || onGoToWhatsAppImport}
+            className="group bg-white rounded-2xl border-2 border-emerald-500/40 hover:border-emerald-500 p-5 shadow-xs hover:shadow-md transition cursor-pointer flex flex-col justify-between"
           >
             <div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <Smartphone className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center mb-4 group-hover:scale-105 transition-transform shadow-xs">
+                <MessageSquare className="w-6 h-6 fill-current" />
               </div>
-              <h3 className="text-base font-bold text-stone-900 group-hover:text-amber-700 transition-colors">
-                WhatsApp Batch Import
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-stone-900 group-hover:text-emerald-700 transition-colors">
+                  WhatsApp Forwarding Bot
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                  Android
+                </span>
+              </div>
               <p className="text-xs text-stone-600 mt-1.5 leading-relaxed">
-                Simulate how your father selects 30–50 photos inside WhatsApp and sends them straight into the catalogue.
+                Forward 40–50 photos directly in WhatsApp on Android. Bot automatically catches them, extracts rates with Gemini AI, and adds them to catalogue.
               </p>
             </div>
-            <div className="pt-4 mt-4 border-t border-stone-100 flex items-center justify-between">
-              <span className="text-xs font-semibold text-emerald-700">Open WhatsApp Importer</span>
+            <div className="pt-4 mt-4 border-t border-emerald-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-700">Link WhatsApp / Manage Bot</span>
               <ArrowRight className="w-4 h-4 text-emerald-700 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
