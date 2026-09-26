@@ -170,8 +170,14 @@ export class WhatsAppBotService {
       }
     }
 
-    // 2. Image messages (forwarded or sent directly)
-    const imageMessage = msg.message.imageMessage;
+    // 2. Image messages (forwarded or sent directly, including ephemeral & view-once containers)
+    const messageContent =
+      msg.message?.ephemeralMessage?.message ||
+      msg.message?.viewOnceMessage?.message ||
+      msg.message?.viewOnceMessageV2?.message ||
+      msg.message;
+    const imageMessage = messageContent?.imageMessage;
+
     if (imageMessage) {
       try {
         const buffer = await downloadMediaMessage(
@@ -180,7 +186,7 @@ export class WhatsAppBotService {
           {},
           {
             logger,
-            reuploadRequest: this.sock.updateMediaMessage,
+            reuploadRequest: this.sock?.updateMediaMessage,
           }
         );
 
@@ -196,7 +202,6 @@ export class WhatsAppBotService {
 
           // Check if caption contains supplier hint
           if (caption && caption.length < 50 && !caption.includes('/-')) {
-            // If it looks like a supplier name
             if (caption.toLowerCase().includes('text') || caption.toLowerCase().includes('saree') || caption.toLowerCase().includes('mill')) {
               this.activeSupplier = caption.trim();
             }
@@ -222,7 +227,6 @@ export class WhatsAppBotService {
    */
   private async processBufferedBatch() {
     const imagesToProcess = [...this.bufferedImages];
-    const replyJid = this.currentBatchChatJid;
     const supplier = this.activeSupplier;
 
     this.bufferedImages = [];
@@ -250,18 +254,14 @@ export class WhatsAppBotService {
         };
       });
 
-      const batch = this.dataStore.createBatch(
+      // Call the real DataStore batch ingestion pipeline (runs Gemini Vision OCR)
+      const batch = await this.dataStore.createAndProcessBatch(
         supplier,
-        batchItems.length,
         batchItems,
         'ios_share_extension' // High-priority automated WhatsApp ingestion
       );
 
-      // Trigger OCR asynchronously
-      this.dataStore.processBatch(batch.id).catch((err) => {
-        console.error('[WhatsApp Bot] Batch processing error:', err);
-      });
-
+      console.log(`[WhatsApp Bot] Successfully initiated batch ${batch.id} with ${batchItems.length} designs for "${supplier}"`);
     } catch (err: any) {
       console.error('[WhatsApp Bot] Failed to create batch from WhatsApp photos:', err);
     }

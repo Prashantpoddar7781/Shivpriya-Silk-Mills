@@ -48,10 +48,35 @@ export const WhatsAppBotConnectModal: React.FC<WhatsAppBotConnectModalProps> = (
   };
 
   useEffect(() => {
-    fetchStatus();
+    if (!isOpen) return;
+
+    let isMounted = true;
+    const init = async () => {
+      try {
+        const res = await fetch(apiUrl('/api/whatsapp/status'));
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setStatus(data);
+          if (data.activeSupplier && !supplierInput) {
+            setSupplierInput(data.activeSupplier);
+          }
+          // If not connected and no active QR, automatically start to generate one!
+          if (!data.isConnected && !data.qrCodeDataUrl) {
+            handleStart();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to init WhatsApp bot status:', err);
+      }
+    };
+
+    init();
     const interval = setInterval(fetchStatus, pollInterval);
-    return () => clearInterval(interval);
-  }, [pollInterval]);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isOpen, pollInterval]);
 
   const handleStart = async () => {
     setLoading(true);
@@ -246,9 +271,19 @@ export const WhatsAppBotConnectModal: React.FC<WhatsAppBotConnectModalProps> = (
                       className="w-56 h-56 sm:w-64 sm:h-64 mx-auto rounded-lg"
                     />
                   </div>
-                  <p className="text-xs text-stone-500 font-medium animate-pulse">
-                    Scan with WhatsApp on Android to connect
-                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <p className="text-xs text-stone-600 font-semibold">
+                      QR Code Ready • Scan with WhatsApp
+                    </p>
+                    <button
+                      onClick={handleStart}
+                      title="Reload fresh QR code"
+                      className="ml-1 p-1 text-stone-400 hover:text-stone-700 rounded-md transition cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="py-8 space-y-3">
@@ -258,24 +293,35 @@ export const WhatsAppBotConnectModal: React.FC<WhatsAppBotConnectModalProps> = (
                   </p>
                   <button
                     onClick={handleStart}
-                    className="mt-2 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-xs font-semibold"
+                    disabled={loading}
+                    className="mt-2 px-4 py-2 bg-stone-900 hover:bg-black text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center justify-center gap-2 mx-auto"
                   >
-                    Click to Reconnect
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    <span>Generate QR Code Now</span>
                   </button>
                 </div>
               )}
 
-              {/* Android Connection Steps */}
-              <div className="text-left bg-stone-50 p-4 rounded-xl border border-stone-200 space-y-2">
-                <p className="font-bold text-stone-900 flex items-center gap-1.5">
+              {/* Android Connection Steps with Safety Guidance */}
+              <div className="text-left bg-stone-50 p-4 rounded-xl border border-stone-200 space-y-2.5">
+                <p className="font-bold text-stone-900 flex items-center gap-1.5 text-xs sm:text-sm">
                   <Smartphone className="w-4 h-4 text-emerald-600" />
-                  <span>How to scan on Android (3 steps):</span>
+                  <span>How to scan with your Spare Number (3 steps):</span>
                 </p>
-                <ol className="list-decimal pl-4 space-y-1 text-xs text-stone-600">
-                  <li>Open <strong>WhatsApp</strong> on your Android phone.</li>
-                  <li>Tap the <strong>3 vertical dots (⋮)</strong> in the top-right corner.</li>
-                  <li>Tap <strong>Linked devices</strong> &rarr; tap <strong>Link a device</strong> &rarr; point camera at the QR code above!</li>
+                <ol className="list-decimal pl-4 space-y-1.5 text-xs text-stone-600">
+                  <li>
+                    Open <strong>WhatsApp Business</strong> on your phone (registered with your spare keypad number).
+                  </li>
+                  <li>
+                    Tap the <strong>3 vertical dots (⋮)</strong> in the top-right corner.
+                  </li>
+                  <li>
+                    Tap <strong>Linked devices</strong> &rarr; tap <strong>Link a device</strong> &rarr; point camera at the QR code above!
+                  </li>
                 </ol>
+                <p className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200/60 mt-1">
+                  🔒 <strong>Privacy Note:</strong> By scanning with WhatsApp Business on your spare number, your personal WhatsApp chats and family groups stay 100% private and untouched!
+                </p>
               </div>
             </div>
           )}
