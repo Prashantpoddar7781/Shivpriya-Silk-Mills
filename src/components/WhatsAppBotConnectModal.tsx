@@ -242,19 +242,19 @@ export const WhatsAppBotConnectModal: React.FC<WhatsAppBotConnectModalProps> = (
                 </p>
                 <ol className="list-decimal pl-4 space-y-1.5 text-xs text-stone-700">
                   <li>
-                    Open WhatsApp on your Android phone and go to your supplier&apos;s chat.
+                    Open WhatsApp on your phone and go to your supplier&apos;s chat.
                   </li>
                   <li>
                     Long-press the first saree photo, then tap all 40–50 photos received today.
                   </li>
                   <li>
-                    Tap the regular WhatsApp <strong>Forward arrow (➡️)</strong>.
+                    Tap the regular WhatsApp <strong>Forward arrow (➡️)</strong> and send to this bot number.
                   </li>
                   <li>
-                    Select this bot chat (or forward to your own number / group).
+                    The bot will receive the photos and reply: <em>&ldquo;📸 Received 40 photos! Please reply with the Supplier Name&rdquo;</em>.
                   </li>
                   <li>
-                    Tap <strong>Send</strong>! The bot will automatically buffer all 50 photos, run Gemini AI OCR, and upload them to the catalogue!
+                    Simply type your supplier&apos;s name (e.g. <strong>Radhe Krishna Tex</strong>) and send. The bot will save the entire batch and start Gemini OCR!
                   </li>
                 </ol>
               </div>
