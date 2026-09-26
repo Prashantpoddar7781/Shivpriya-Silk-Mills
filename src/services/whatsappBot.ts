@@ -145,7 +145,10 @@ export class WhatsAppBotService {
     const fromJid = msg.key.remoteJid;
     if (!fromJid || fromJid === 'status@broadcast') return;
 
-    // 1. Text commands (e.g. "supplier: Radhe Krishna", "status", "help")
+    // NEVER process or reply to WhatsApp Groups (to protect family/business groups)
+    if (fromJid.endsWith('@g.us')) return;
+
+    // 1. Text commands (only explicit supplier setting, NO greetings or unsolicited auto-replies)
     const text = (
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
@@ -157,45 +160,13 @@ export class WhatsAppBotService {
       const lower = text.toLowerCase();
 
       // Check if user is setting supplier name
-      if (lower.startsWith('supplier:') || lower.startsWith('mill:') || lower.startsWith('set supplier')) {
+      if (lower.startsWith('supplier:') || lower.startsWith('mill:') || lower.startsWith('set supplier:')) {
         const parts = text.split(':');
         const newSupplier = parts.length > 1 ? parts.slice(1).join(':').trim() : '';
         if (newSupplier) {
           this.activeSupplier = newSupplier;
-          await this.sendReply(fromJid, `✅ *Active Supplier set to:* ${this.activeSupplier}\nForward photos now and they will be tagged under this supplier.`);
           return;
         }
-      }
-
-      // Quick status command
-      if (lower === 'status' || lower === 'catalogue status') {
-        const products = this.dataStore.getProducts({});
-        const needsReview = products.filter(p => p.status === 'needs_review');
-        await this.sendReply(
-          fromJid,
-          `🛍️ *Shivpriya Silk Mills • Catalogue Bot*\n\n` +
-          `• 📦 *Total Live Designs:* ${products.length}\n` +
-          `• ⚠️ *Needs Review:* ${needsReview.length}\n` +
-          `• 🏭 *Active Supplier:* ${this.activeSupplier}\n\n` +
-          `🌐 *Portal:* https://shivpriyasilkmills.vercel.app`
-        );
-        return;
-      }
-
-      // Help command
-      if (lower === 'help' || lower === 'hi' || lower === 'hello') {
-        await this.sendReply(
-          fromJid,
-          `👋 *Welcome to Shivpriya Silk Mills Bot!*\n\n` +
-          `*How to forward photos on Android:*\n` +
-          `1. Long-press 10 to 50 saree photos from any supplier.\n` +
-          `2. Tap the Forward arrow (➡️) and send to this chat.\n` +
-          `3. All photos will automatically be imported with Gemini AI OCR!\n\n` +
-          `*Commands:*\n` +
-          `• Type *Supplier: <Name>* to change current supplier\n` +
-          `• Type *Status* to see live catalogue count`
-        );
-        return;
       }
     }
 
@@ -263,14 +234,6 @@ export class WhatsAppBotService {
     const count = imagesToProcess.length;
     console.log(`[WhatsApp Bot] Processing burst of ${count} forwarded images for "${supplier}"...`);
 
-    if (replyJid) {
-      await this.sendReply(
-        replyJid,
-        `📥 *Received ${count} wholesale designs for "${supplier}"!*\n` +
-        `Running Gemini Vision AI to extract rates & fabrics... ⚡`
-      );
-    }
-
     try {
       const batchItems = imagesToProcess.map((item, index) => {
         const hash = crypto.createHash('md5').update(item.buffer).digest('hex');
@@ -295,37 +258,18 @@ export class WhatsAppBotService {
       );
 
       // Trigger OCR asynchronously
-      this.dataStore.processBatch(batch.id).then(async (updatedBatch) => {
-        if (replyJid && updatedBatch) {
-          await this.sendReply(
-            replyJid,
-            `✅ *Batch Processed Successfully!*\n\n` +
-            `🏭 *Supplier:* ${updatedBatch.supplierName}\n` +
-            `📦 *Total Designs:* ${updatedBatch.totalImages}\n` +
-            `✨ *Ready for Buyers:* ${updatedBatch.readyCount}\n` +
-            `⚠️ *Needs Review:* ${updatedBatch.reviewCount}\n\n` +
-            `👉 View & Share on WhatsApp: https://shivpriyasilkmills.vercel.app`
-          );
-        }
-      }).catch((err) => {
+      this.dataStore.processBatch(batch.id).catch((err) => {
         console.error('[WhatsApp Bot] Batch processing error:', err);
       });
 
     } catch (err: any) {
       console.error('[WhatsApp Bot] Failed to create batch from WhatsApp photos:', err);
-      if (replyJid) {
-        await this.sendReply(replyJid, `❌ Failed to save batch: ${err.message || 'Unknown error'}`);
-      }
     }
   }
 
-  private async sendReply(jid: string, text: string) {
-    if (!this.sock || this.connectionState !== 'connected') return;
-    try {
-      await this.sock.sendMessage(jid, { text });
-    } catch (err) {
-      console.warn('[WhatsApp Bot] Failed to send WhatsApp reply:', err);
-    }
+  private async sendReply(_jid: string, _text: string) {
+    // Completely silenced to never send unsolicited messages from any WhatsApp account
+    return;
   }
 
   public async logout(): Promise<void> {

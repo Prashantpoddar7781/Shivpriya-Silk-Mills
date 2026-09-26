@@ -139,9 +139,9 @@ async function startServer() {
     });
   });
 
-  // --- WhatsApp Bot Endpoints for Android Forwarding ---
+  // --- WhatsApp Bot Endpoints (Disabled from auto-starting to protect personal WhatsApp) ---
   const whatsappBot = new WhatsAppBotService(dataStore);
-  whatsappBot.start().catch((err) => console.error('[WhatsApp Bot] Boot error:', err));
+  // NOTE: Never auto-start on boot to prevent interfering with personal WhatsApp accounts
 
   app.get('/api/whatsapp/status', (req, res) => {
     res.json(whatsappBot.getStatus());
